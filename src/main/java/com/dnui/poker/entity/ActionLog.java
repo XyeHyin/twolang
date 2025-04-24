@@ -20,16 +20,16 @@ public class ActionLog {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "game_session_id")
-    private GameSession gameSession;
-
-    @ManyToOne
-    @JoinColumn(name = "player_id")
     private Player player;
 
-    private String actionType; // "bet", "fold", "check"等
+    @ManyToOne
+    private GameSession gameSession;
 
-    private int amount;
+    private String actionType; // "bet", "raise", "call", "fold", "check" 等
+
+    private int amount; // 操作金额，非下注类为0
+
+    private int round; // 第几轮（翻牌前/翻牌/转牌/河牌）
 
     private Date actionTime;
 }

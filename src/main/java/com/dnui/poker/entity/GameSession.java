@@ -18,6 +18,20 @@ public class GameSession {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private Date startTime;
+     
+    @OneToMany(mappedBy = "gameSession")
+    private List<Player> players;
+
+    private int pot;
+    @ManyToOne
+    private Player smallBlindPlayer;
+
+    private int currentRound; // 0-翻牌前, 1-翻牌, 2-转牌, 3-河牌
+
+    @ManyToOne
+    private Player currentActionPlayer;
+
+    
+    
 }

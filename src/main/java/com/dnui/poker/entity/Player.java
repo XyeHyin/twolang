@@ -24,5 +24,15 @@ public class Player {
 
     private int seatNumber; // 座位号
 
-    private boolean isOnline;
+    private boolean online;
+
+    private int betChips; // 玩家当前下注的筹码
+
+    private int totalBetChips; // 玩家总下注的筹码
+
+    @ManyToOne
+    @JoinColumn(name = "game_session_id")
+    private GameSession gameSession;
+
+
 }
