@@ -1,8 +1,6 @@
 package com.dnui.poker.service;
 
-import com.dnui.poker.command.BetCommand;
-import com.dnui.poker.command.Command;
-import com.dnui.poker.command.FoldCommand;
+import com.dnui.poker.command.*;
 import com.dnui.poker.strategy.PokerComparator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,14 +20,13 @@ public class GameService {
     private PlayerService playerService;
     @Autowired
     private PokerComparator pokerComparator;
+    @Autowired
+    private CommandInvoker commandInvoker;
 
     public void startGame(Long tableId) {
-        // 1. 洗牌、发牌
         dealerService.shuffle();
         dealerService.dealCards(tableId);
-
-        // 2. 通知所有玩家游戏开始（Observer推送）
-        // gameObserver.notifyGameStart(...);
+        // Observer推送游戏开始
     }
 
     public void handlePlayerAction(Long playerId, String action, int amount) {
@@ -37,15 +34,16 @@ public class GameService {
         switch (action) {
             case "bet" -> command = new BetCommand(amount);
             case "fold" -> command = new FoldCommand();
+            case "check" -> command = new CheckCommand();
             default -> throw new IllegalArgumentException("未知操作");
         }
-        command.execute();
+        commandInvoker.executeCommand(command);
         // 判断是否进入下一轮或结算
     }
 
     public void settle(Long tableId) {
-        // 1. 获取所有玩家手牌和公共牌
-        // 2. 调用pokerComparator.compare(...)进行比牌
-        // 3. 结算筹码，推送结果
+        // 获取玩家手牌和公共牌
+        // 调用pokerComparator.compare(...)
+        // 结算筹码，推送结果
     }
 }

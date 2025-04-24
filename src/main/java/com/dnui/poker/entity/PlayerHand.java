@@ -5,17 +5,21 @@ import lombok.Data;
 
 /**
  * @Author: XyeHyin
- * @Date: 2025/4/24 13:46
+ * @Date: 2025/4/24 19:15
  * @packageName:IntelliJ IDEA
  * @Description: TODO
  * @Version: 1.0
  */
 @Entity
 @Data
-public class PublicCard {
+public class PlayerHand {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "player_id")
+    private Player player;
 
     @ManyToOne
     @JoinColumn(name = "game_session_id")
@@ -23,5 +27,5 @@ public class PublicCard {
 
     private String cardValue; // 如 "AS", "KH"
 
-    private int cardOrder; // 公共牌顺序（1-5）
+    private int cardOrder; // 手牌顺序（1-2）
 }

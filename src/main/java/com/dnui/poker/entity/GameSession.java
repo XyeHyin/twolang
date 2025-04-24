@@ -9,7 +9,7 @@ import java.util.List;
  * @Author: XyeHyin
  * @Date: 2025/4/24 13:46
  * @packageName:IntelliJ IDEA
- * @Description: TODO
+ * @Description: 牌局/房间实体
  * @Version: 1.0
  */
 @Entity

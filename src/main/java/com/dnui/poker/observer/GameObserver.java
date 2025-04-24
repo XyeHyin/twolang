@@ -8,4 +8,7 @@ package com.dnui.poker.observer;
  * @Version: 1.0
  */
 public class GameObserver {
+    public void notifyGameStart(Long tableId) {
+        // WebSocket推送所有玩家
+    }
 }

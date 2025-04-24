@@ -7,7 +7,7 @@ import lombok.Data;
  * @Author: XyeHyin
  * @Date: 2025/4/24 13:46
  * @packageName:IntelliJ IDEA
- * @Description: TODO
+ * @Description: 玩家实体
  * @Version: 1.0
  */
 

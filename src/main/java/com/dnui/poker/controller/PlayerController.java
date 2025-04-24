@@ -22,4 +22,16 @@ public class PlayerController {
     public Player createPlayer(@RequestParam String nickname) {
         return playerService.createPlayer(nickname);
     }
+
+    @PostMapping("/join")
+    public String joinRoom(@RequestParam Long playerId, @RequestParam Long tableId) {
+        // 加入房间逻辑
+        return "joined";
+    }
+
+    @PostMapping("/leave")
+    public String leaveRoom(@RequestParam Long playerId, @RequestParam Long tableId) {
+        // 离开房间逻辑
+        return "left";
+    }
 }

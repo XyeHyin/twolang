@@ -2,10 +2,7 @@ package com.dnui.poker.controller;
 
 import com.dnui.poker.service.GameService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * @Author: XyeHyin
@@ -30,5 +27,11 @@ public class GameController {
     public String playerAction(@RequestParam Long playerId, @RequestParam String action, @RequestParam int amount) {
         gameService.handlePlayerAction(playerId, action, amount);
         return "Action processed";
+    }
+
+    @GetMapping("/status")
+    public String getGameStatus(@RequestParam Long tableId) {
+        // 查询当前牌局状态
+        return "status";
     }
 }
