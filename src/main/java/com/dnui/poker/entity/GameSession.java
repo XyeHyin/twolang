@@ -20,8 +20,13 @@ public class GameSession {
     private Long id;
     private Date startTime;
      
-    @OneToMany(mappedBy = "gameSession")
+    @OneToMany(mappedBy = "gameSession", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Player> players;
+
+    @Enumerated(EnumType.STRING)
+    private com.dnui.poker.dto.GamePhase phase; // 牌局阶段
+
+    private boolean isActive; // 是否为当前活跃牌局
 
     private int pot;
     @ManyToOne

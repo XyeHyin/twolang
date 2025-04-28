@@ -13,7 +13,7 @@ public class PlayerFactory {
     public static Player createPlayer(String nickname) {
         Player player = new Player();
         player.setNickname(nickname);
-        player.setChips(1000);
+        player.setChips(10000);
         player.setOnline(true);
         return player;
     }

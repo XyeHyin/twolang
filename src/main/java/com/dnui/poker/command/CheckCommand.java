@@ -1,15 +1,21 @@
 package com.dnui.poker.command;
 
+import com.dnui.poker.service.PlayerService;
+
 /**
- * @Author: XyeHyin
- * @Date: 2025/4/24 17:30
- * @packageName:IntelliJ IDEA
- * @Description: TODO
- * @Version: 1.0
+ * 过牌命令
  */
 public class CheckCommand implements Command {
+    private final Long playerId;
+    private final PlayerService playerService;
+
+    public CheckCommand(Long playerId, PlayerService playerService) {
+        this.playerId = playerId;
+        this.playerService = playerService;
+    }
+
     @Override
     public void execute() {
-        // 执行过牌逻辑
+        playerService.check(playerId);
     }
 }

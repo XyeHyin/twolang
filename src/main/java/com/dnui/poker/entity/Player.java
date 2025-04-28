@@ -30,9 +30,14 @@ public class Player {
 
     private int totalBetChips; // 玩家总下注的筹码
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "game_session_id")
     private GameSession gameSession;
 
+    @Enumerated(EnumType.STRING)
+    private PlayerStatus status; // 玩家状态
 
+    public enum PlayerStatus {
+        WAITING, ACTIVE, FOLDED, ALL_IN, SETTLED
+    }
 }

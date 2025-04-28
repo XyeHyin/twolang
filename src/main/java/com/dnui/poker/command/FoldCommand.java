@@ -1,15 +1,21 @@
 package com.dnui.poker.command;
 
+import com.dnui.poker.service.PlayerService;
+
 /**
- * @Author: XyeHyin
- * @Date: 2025/4/24 13:45
- * @packageName:IntelliJ IDEA
- * @Description: TODO
- * @Version: 1.0
+ * 弃牌命令
  */
 public class FoldCommand implements Command {
+    private final Long playerId;
+    private final PlayerService playerService;
+
+    public FoldCommand(Long playerId, PlayerService playerService) {
+        this.playerId = playerId;
+        this.playerService = playerService;
+    }
+
     @Override
     public void execute() {
-        // 执行弃牌逻辑
+        playerService.fold(playerId);
     }
 }

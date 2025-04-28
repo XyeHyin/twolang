@@ -16,8 +16,8 @@ public class TableStatusVO {
     private Long tableId;
     private List<PlayerDTO> players;
     private List<String> publicCards; // 例如 ["AS", "KH", "7D"]
-    private int pot; // 当前底池
-    // "preflop", "flop", "turn", "river", "showdown"
+    private int pot; 
+    private GamePhase phase; 
     public enum GamePhase {
         PRE_FLOP,
         FLOP,

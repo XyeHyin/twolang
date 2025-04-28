@@ -9,3 +9,5 @@ spring:
       ddl-auto: update   # 可选值: create, update, validate, none
     show-sql: true
     database-platform: org.hibernate.dialect.MySQL8Dialect
+    poker:
+      deck-type: standard  # 可选值: standard 或 short
