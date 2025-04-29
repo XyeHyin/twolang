@@ -5,7 +5,7 @@ public interface PaymentService {
      * 支付，返回二维码图片URL
      */
     String pay(String userId, double amount);
-}
+}   
 
 // 支付宝SDK
 public class AliPaySDK {
@@ -21,4 +21,6 @@ public class WechatPaySDK {
         // ...调用微信支付...
         return true;
     }
-}
+}*-+
++
+-
