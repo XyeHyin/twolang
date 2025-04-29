@@ -59,7 +59,7 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
         // 通知结算事件
         gameService.getGameObserver().notifyGameSettle(session.getId());
         gameService.getEventPublisher().publishEvent(
-            new com.dnui.poker.event.GameEvent(this, session.getId(), "settle")
+                new com.dnui.poker.event.GameEvent(this, session.getId(), "settle")
         );
     }
 
@@ -70,7 +70,7 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
         // 通知结束事件
         gameService.getGameObserver().notifyGameEnd(session.getId());
         gameService.getEventPublisher().publishEvent(
-            new com.dnui.poker.event.GameEvent(this, session.getId(), "finish")
+                new com.dnui.poker.event.GameEvent(this, session.getId(), "finish")
         );
     }
 
@@ -86,7 +86,11 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
         if (isBettingRoundOver(session)) {
             advanceGamePhase(session);
         }
-        if (session.getPhase() == GamePhase.SHOWDOWN) {
+        // 新增：如果只剩一名未弃牌玩家，直接结算
+        long activeCount = session.getPlayers().stream()
+                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
+                .count();
+        if (activeCount <= 1 || session.getPhase() == GamePhase.SHOWDOWN) {
             settle(session);
         }
     }
@@ -94,13 +98,13 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
     // 判断下注轮是否结束（与原GameService逻辑一致）
     private boolean isBettingRoundOver(GameSession session) {
         int maxBet = session.getPlayers().stream()
-            .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
-            .mapToInt(Player::getBetChips)
-            .max().orElse(0);
+                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
+                .mapToInt(Player::getBetChips)
+                .max().orElse(0);
 
         return session.getPlayers().stream()
-            .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE)
-            .allMatch(p -> p.getBetChips() == maxBet);
+                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE)
+                .allMatch(p -> p.getBetChips() == maxBet);
     }
 
     // 推进游戏阶段（与原GameService逻辑一致）
@@ -119,7 +123,8 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
                 dealerService.dealRiver(session);
             }
             case RIVER -> session.setPhase(GamePhase.SHOWDOWN);
-            default -> {}
+            default -> {
+            }
         }
         // 重置每个玩家本轮下注
         session.getPlayers().forEach(p -> p.setBetChips(0));

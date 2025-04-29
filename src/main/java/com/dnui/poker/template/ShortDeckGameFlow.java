@@ -59,7 +59,7 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
         // 通知结算事件
         gameService.getGameObserver().notifyGameSettle(session.getId());
         gameService.getEventPublisher().publishEvent(
-            new com.dnui.poker.event.GameEvent(this, session.getId(), "settle")
+                new com.dnui.poker.event.GameEvent(this, session.getId(), "settle")
         );
     }
 
@@ -70,7 +70,7 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
         // 通知结束事件
         gameService.getGameObserver().notifyGameEnd(session.getId());
         gameService.getEventPublisher().publishEvent(
-            new com.dnui.poker.event.GameEvent(this, session.getId(), "finish")
+                new com.dnui.poker.event.GameEvent(this, session.getId(), "finish")
         );
     }
 
@@ -84,20 +84,23 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
         if (isBettingRoundOver(session)) {
             advanceGamePhase(session);
         }
-        if (session.getPhase() == GamePhase.SHOWDOWN) {
+        long activeCount = session.getPlayers().stream()
+                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
+                .count();
+        if (activeCount <= 1 || session.getPhase() == GamePhase.SHOWDOWN) {
             settle(session);
         }
     }
 
     private boolean isBettingRoundOver(GameSession session) {
         int maxBet = session.getPlayers().stream()
-            .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
-            .mapToInt(Player::getBetChips)
-            .max().orElse(0);
+                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
+                .mapToInt(Player::getBetChips)
+                .max().orElse(0);
 
         return session.getPlayers().stream()
-            .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE)
-            .allMatch(p -> p.getBetChips() == maxBet);
+                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE)
+                .allMatch(p -> p.getBetChips() == maxBet);
     }
 
     private void advanceGamePhase(GameSession session) {
@@ -115,7 +118,8 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
                 dealerService.dealRiver(session);
             }
             case RIVER -> session.setPhase(GamePhase.SHOWDOWN);
-            default -> {}
+            default -> {
+            }
         }
         session.getPlayers().forEach(p -> p.setBetChips(0));
         gameService.getGameSessionRepository().save(session);

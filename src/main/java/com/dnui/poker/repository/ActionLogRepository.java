@@ -18,7 +18,10 @@ import java.util.List;
 @Repository
 public interface ActionLogRepository extends JpaRepository<ActionLog, Long> {
     List<ActionLog> findByGameSession(GameSession gameSession);
+
     List<ActionLog> findByPlayer(Player player);
+
     List<ActionLog> findByGameSessionAndPlayer(GameSession gameSession, Player player);
+
     List<ActionLog> findByGameSessionAndRound(GameSession gameSession, int round);
 }

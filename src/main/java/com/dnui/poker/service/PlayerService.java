@@ -73,8 +73,8 @@ public class PlayerService {
         Player player = playerRepository.findById(playerId).orElseThrow();
         GameSession session = player.getGameSession();
         int maxBet = session.getPlayers().stream()
-            .mapToInt(Player::getBetChips)
-            .max().orElse(0);
+                .mapToInt(Player::getBetChips)
+                .max().orElse(0);
         int toCall = maxBet - player.getBetChips();
         if (player.getChips() < toCall) throw new IllegalArgumentException("筹码不足以跟注");
         bet(playerId, toCall);
@@ -85,6 +85,8 @@ public class PlayerService {
         Player player = playerRepository.findById(playerId).orElseThrow();
         player.setStatus(Player.PlayerStatus.FOLDED);
         playerRepository.save(player); // repository落地
+        // 可选：如需彻底移除玩家手牌，可在此处清理PlayerHand
+        // playerHandRepository.deleteByPlayer(player);
     }
 
     // 过牌
@@ -92,8 +94,8 @@ public class PlayerService {
         Player player = playerRepository.findById(playerId).orElseThrow();
         GameSession session = player.getGameSession();
         int maxBet = session.getPlayers().stream()
-            .mapToInt(Player::getBetChips)
-            .max().orElse(0);
+                .mapToInt(Player::getBetChips)
+                .max().orElse(0);
         if (maxBet > 0 && player.getBetChips() < maxBet) {
             throw new IllegalStateException("当前不能过牌，只能跟注或弃牌");
         }

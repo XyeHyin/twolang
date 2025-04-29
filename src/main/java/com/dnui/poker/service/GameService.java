@@ -77,7 +77,7 @@ public class GameService {
     // 提供给模板调用：获取PokerCompareStrategy
     /**
      * -- SETTER --
-     *  设置牌型比较策略（可根据房间配置动态注入）
+     * 设置牌型比较策略（可根据房间配置动态注入）
      */
     @Getter
     @Setter
@@ -101,7 +101,7 @@ public class GameService {
      */
     public void startGame(Long tableId) {
         GameSession session = gameSessionRepository.findById(tableId)
-            .orElseThrow(() -> new IllegalArgumentException("房间不存在"));
+                .orElseThrow(() -> new IllegalArgumentException("房间不存在"));
         session.setActive(true);
         session.setStartTime(new Date());
         gameSessionRepository.save(session);

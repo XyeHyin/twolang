@@ -82,8 +82,8 @@ public class DealerService {
         }
         for (Player player : players) {
             List<PokerComparator.Card> hand = new ArrayList<>();
-            hand.add(deck.removeFirst());
-            hand.add(deck.removeFirst());
+            hand.add(deck.remove(0));
+            hand.add(deck.remove(0));
             // 保存到PlayerHand表
             for (int i = 0; i < hand.size(); i++) {
                 PlayerHand playerHand = new PlayerHand();
@@ -102,7 +102,7 @@ public class DealerService {
     public void dealFlop(GameSession session) {
         List<PublicCard> flop = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            PokerComparator.Card card = deck.removeFirst();
+            PokerComparator.Card card = deck.remove(0);
             PublicCard publicCard = new PublicCard();
             publicCard.setGameSession(session);
             publicCard.setCardValue(card.toString().toUpperCase());
@@ -116,7 +116,7 @@ public class DealerService {
      * 发公共牌（转牌）
      */
     public void dealTurn(GameSession session) {
-        PokerComparator.Card card = deck.removeFirst();
+        PokerComparator.Card card = deck.remove(0);
         PublicCard publicCard = new PublicCard();
         publicCard.setGameSession(session);
         publicCard.setCardValue(card.toString().toUpperCase());
@@ -128,7 +128,7 @@ public class DealerService {
      * 发公共牌（河牌）
      */
     public void dealRiver(GameSession session) {
-        PokerComparator.Card card = deck.removeFirst();
+        PokerComparator.Card card = deck.remove(0);
         PublicCard publicCard = new PublicCard();
         publicCard.setGameSession(session);
         publicCard.setCardValue(card.toString().toUpperCase());
@@ -142,7 +142,7 @@ public class DealerService {
     public void dealPublicCard(GameSession session) {
         // 修复：直接查库获取当前公共牌数量，避免session未同步问题
         int order = (int) publicCardRepository.countByGameSession(session) + 1;
-        PokerComparator.Card card = deck.removeFirst();
+        PokerComparator.Card card = deck.remove(0);
         PublicCard publicCard = new PublicCard();
         publicCard.setGameSession(session);
         publicCard.setCardValue(card.toString().toUpperCase());
