@@ -8,44 +8,33 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-@Component
-public class GameEventListenerImpl implements GameEventListener {
-    @Autowired
-    private GameWebSocketService wsService;
-    @Autowired
-    private GameService gameService;
+/**
+ * 游戏事件监听器接口
+ * 支持多种事件类型，便于事件广播
+ */
+public interface GameEventListener {
+    /**
+     * 游戏开始事件
+     * @param tableId 牌桌ID
+     */
+    void onGameStart(Long tableId);
 
-    @EventListener
-    public void onGameEvent(GameEvent event) {
-        if ("settle".equals(event.getType())) {
-            // 获取结算详情VO
-            GameResultVO resultVO = gameService.buildGameResultVO(event.getTableId());
-            wsService.sendGameEvent(event.getTableId(), "settle", resultVO);
-        } else if ("action".equals(event.getType())) {
-            // 推送玩家操作（可自定义DTO）
-            wsService.sendGameEvent(event.getTableId(), "action", event.getPayload());
-        } else {
-            wsService.sendGameEvent(event.getTableId(), event.getType(), null);
-        }
-    }
+    /**
+     * 游戏结算事件
+     * @param tableId 牌桌ID
+     */
+    void onGameSettle(Long tableId);
 
-    @Override
-    public void onGameStart(Long tableId) {
-        // Implementation here
-    }
+    /**
+     * 发牌事件
+     * @param tableId 牌桌ID
+     */
+    void onDealCard(Long tableId);
 
-    @Override
-    public void onGameSettle(Long tableId) {
-        // Implementation here
-    }
-
-    @Override
-    public void onDealCard(Long tableId) {
-        // Implementation here
-    }
-
-    @Override
-    public void onGameEnd(Long tableId) {
-        // Implementation here
-    }
+    /**
+     * 游戏结束事件
+     * @param tableId 牌桌ID
+     */
+    void onGameEnd(Long tableId);
 }
+
