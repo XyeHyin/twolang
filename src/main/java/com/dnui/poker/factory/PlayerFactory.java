@@ -10,11 +10,12 @@ import com.dnui.poker.entity.Player;
  * @Version: 1.0
  */
 public class PlayerFactory {
-    public static Player createPlayer(String nickname) {
+    public static Player createPlayer(Long playerId, String nickname, int chips) {
         Player player = new Player();
+        player.setId(playerId);
         player.setNickname(nickname);
-        player.setChips(10000);
-        player.setOnline(true);
+        player.setChips(chips);
+        // 其他初始化
         return player;
     }
 }

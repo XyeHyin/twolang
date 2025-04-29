@@ -1,5 +1,7 @@
 package com.dnui.poker.strategy;
 
+import com.dnui.poker.factory.CardFactory;
+
 import java.util.*;
 
 /**
@@ -10,22 +12,21 @@ import java.util.*;
  * @Version: 1.0
  */
 public class ShortDeckCompareStrategy implements PokerCompareStrategy {
-    public List<PokerComparator.Card> getShortDeck() {
-        List<PokerComparator.Card> deck = new ArrayList<>();
-        for (PokerComparator.Suit suit : PokerComparator.Suit.values()) {
-            for (PokerComparator.Rank rank : PokerComparator.Rank.values()) {
-                if (rank.value >= 6 || rank == PokerComparator.Rank.ACE) { // 只保留A,6,7,8,9,10,J,Q,K
-                    deck.add(new PokerComparator.Card(suit, rank));
-                }
-            }
-        }
-        return deck;
+    private final CardFactory cardFactory;
+
+    public ShortDeckCompareStrategy(CardFactory cardFactory) {
+        this.cardFactory = cardFactory;
     }
+
+    public List<PokerComparator.Card> getShortDeck() {
+        // 推荐直接用工厂获取
+        return cardFactory.createDeck();
+    }
+
     @Override
     public int compare(List<PokerComparator.Card> handA, List<PokerComparator.Card> handB, List<PokerComparator.Card> pool) {
         PokerComparator.HandResult resultA = evaluateBestHand(handA, pool);
         PokerComparator.HandResult resultB = evaluateBestHand(handB, pool);
-        // 葫芦大于同花
         int typeA = adjustHandType(resultA.type);
         int typeB = adjustHandType(resultB.type);
         if (typeA != typeB) return Integer.compare(typeA, typeB);
@@ -58,15 +59,15 @@ public class ShortDeckCompareStrategy implements PokerCompareStrategy {
         counts.sort(Collections.reverseOrder());
 
         if (flush && straight && isRoyal(cards)) {
-            return new PokerComparator.HandResult(PokerComparator.HandType.ROYAL_FLUSH, Arrays.asList(PokerComparator.Rank.ACE.value));
+            return new PokerComparator.HandResult(PokerComparator.HandType.ROYAL_FLUSH, List.of(PokerComparator.Rank.ACE.value));
         }
         if (flush && straight) {
             int maxStraight = getStraightHighCard(cards);
-            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT_FLUSH, Arrays.asList(maxStraight));
+            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT_FLUSH, List.of(maxStraight));
         }
         if (counts.get(0) == 4) {
             int four = getKeyByValue(countMap, 4);
-            int kicker = getKeyByValue(countMap, 1);
+            int kicker = getKickers(countMap, four).get(0);
             return new PokerComparator.HandResult(PokerComparator.HandType.FOUR_OF_A_KIND, Arrays.asList(four, kicker));
         }
         if (counts.get(0) == 3 && counts.size() > 1 && counts.get(1) == 2) {
@@ -79,11 +80,11 @@ public class ShortDeckCompareStrategy implements PokerCompareStrategy {
         }
         if (straight) {
             int maxStraight = getStraightHighCard(cards);
-            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT, Arrays.asList(maxStraight));
+            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT, List.of(maxStraight));
         }
         if (counts.get(0) == 3) {
             int three = getKeyByValue(countMap, 3);
-            List<Integer> kickers = getKickers(countMap, three, -1);
+            List<Integer> kickers = getKickers(countMap, three);
             List<Integer> ranks = new ArrayList<>();
             ranks.add(three);
             ranks.addAll(kickers);
@@ -92,14 +93,15 @@ public class ShortDeckCompareStrategy implements PokerCompareStrategy {
         if (counts.get(0) == 2 && counts.size() > 1 && counts.get(1) == 2) {
             List<Integer> pairs = getKeysByValue(countMap, 2);
             pairs.sort(Collections.reverseOrder());
-            int kicker = getKeyByValue(countMap, 1);
+            List<Integer> kickers = getKickers(countMap, pairs.get(0), pairs.get(1));
+            int kicker = kickers.isEmpty() ? -1 : kickers.get(0);
             List<Integer> ranks = new ArrayList<>(pairs);
             ranks.add(kicker);
             return new PokerComparator.HandResult(PokerComparator.HandType.TWO_PAIR, ranks);
         }
         if (counts.get(0) == 2) {
             int pair = getKeyByValue(countMap, 2);
-            List<Integer> kickers = getKickers(countMap, pair, -1);
+            List<Integer> kickers = getKickers(countMap, pair);
             List<Integer> ranks = new ArrayList<>();
             ranks.add(pair);
             ranks.addAll(kickers);
@@ -117,17 +119,19 @@ public class ShortDeckCompareStrategy implements PokerCompareStrategy {
         return true;
     }
 
-    // 短牌顺子判定（A6789为最大顺子）
+    // 短牌顺子判定（A6789为最大顺子，A可作5顺子的1，也可作9顺子的14）
     private boolean isShortDeckStraight(List<PokerComparator.Card> cards) {
         List<Integer> values = new ArrayList<>();
         for (PokerComparator.Card c : cards)
             values.add(c.rank.value);
+        Set<Integer> unique = new HashSet<>(values);
+        if (unique.size() != 5) return false;
         Collections.sort(values, Collections.reverseOrder());
         // 短牌A6789顺子
         if (values.equals(Arrays.asList(14, 9, 8, 7, 6))) {
             return true;
         }
-        // 标准顺子
+        // 标准顺子（含A-10-9-8-7等）
         for (int i = 0; i < values.size() - 1; i++) {
             if (values.get(i) - values.get(i + 1) != 1)
                 return false;
@@ -190,6 +194,7 @@ public class ShortDeckCompareStrategy implements PokerCompareStrategy {
         List<Integer> ranks = new ArrayList<>();
         for (PokerComparator.Card c : cards)
             ranks.add(c.rank.value);
+        ranks.sort(Collections.reverseOrder());
         return ranks;
     }
 

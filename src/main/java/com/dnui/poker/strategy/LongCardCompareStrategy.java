@@ -14,10 +14,7 @@ public class LongCardCompareStrategy implements PokerCompareStrategy {
     public int compare(List<PokerComparator.Card> handA, List<PokerComparator.Card> handB, List<PokerComparator.Card> pool) {
         PokerComparator.HandResult resultA = evaluateBestHand(handA, pool);
         PokerComparator.HandResult resultB = evaluateBestHand(handB, pool);
-        int cmp = resultA.compareTo(resultB);
-        if (cmp > 0)  return 1;
-        if (cmp < 0)  return -1;
-        return 0;
+        return resultA.compareTo(resultB);
     }
 
     @Override
@@ -25,10 +22,9 @@ public class LongCardCompareStrategy implements PokerCompareStrategy {
         List<PokerComparator.Card> all = new ArrayList<>(hand);
         all.addAll(pool);
         PokerComparator.HandResult best = null;
-        List<List<PokerComparator.Card>> combinations = combinations(all, 5);
-        for (List<PokerComparator.Card> comb : combinations) {
+        for (List<PokerComparator.Card> comb : combinations(all, 5)) {
             PokerComparator.HandResult r = evaluateHand(comb);
-            if (best == null || r.compareTo(best) < 0) {
+            if (best == null || r.compareTo(best) > 0) {
                 best = r;
             }
         }
@@ -46,62 +42,81 @@ public class LongCardCompareStrategy implements PokerCompareStrategy {
         List<Integer> counts = new ArrayList<>(countMap.values());
         counts.sort(Collections.reverseOrder());
 
-        if (flush && straight && cards.get(0).rank == PokerComparator.Rank.ACE && cards.get(1).rank == PokerComparator.Rank.KING) {
-            return new PokerComparator.HandResult(PokerComparator.HandType.ROYAL_FLUSH, Arrays.asList(PokerComparator.Rank.ACE.value));
+        // 皇家同花顺
+        if (flush && straight && isRoyal(cards)) {
+            return new PokerComparator.HandResult(PokerComparator.HandType.ROYAL_FLUSH, List.of(PokerComparator.Rank.ACE.value));
         }
+        // 同花顺
         if (flush && straight) {
             int maxStraight = getStraightHighCard(cards);
-            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT_FLUSH, Arrays.asList(maxStraight));
+            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT_FLUSH, List.of(maxStraight));
         }
+        // 四条
         if (counts.get(0) == 4) {
             int four = getKeyByValue(countMap, 4);
-            int kicker = getKeyByValue(countMap, 1);
+            int kicker = getKickers(countMap, four).get(0);
             return new PokerComparator.HandResult(PokerComparator.HandType.FOUR_OF_A_KIND, Arrays.asList(four, kicker));
         }
+        // 葫芦
         if (counts.get(0) == 3 && counts.size() > 1 && counts.get(1) == 2) {
             int three = getKeyByValue(countMap, 3);
             int two = getKeyByValue(countMap, 2);
             return new PokerComparator.HandResult(PokerComparator.HandType.FULL_HOUSE, Arrays.asList(three, two));
         }
+        // 同花
         if (flush) {
             return new PokerComparator.HandResult(PokerComparator.HandType.FLUSH, getRanks(cards));
         }
+        // 顺子
         if (straight) {
             int maxStraight = getStraightHighCard(cards);
-            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT, Arrays.asList(maxStraight));
+            return new PokerComparator.HandResult(PokerComparator.HandType.STRAIGHT, List.of(maxStraight));
         }
+        // 三条
         if (counts.get(0) == 3) {
             int three = getKeyByValue(countMap, 3);
-            List<Integer> kickers = getKickers(countMap, three, -1);
+            List<Integer> kickers = getKickers(countMap, three);
             List<Integer> ranks = new ArrayList<>();
             ranks.add(three);
             ranks.addAll(kickers);
             return new PokerComparator.HandResult(PokerComparator.HandType.THREE_OF_A_KIND, ranks);
         }
+        // 两对
         if (counts.get(0) == 2 && counts.size() > 1 && counts.get(1) == 2) {
             List<Integer> pairs = getKeysByValue(countMap, 2);
             pairs.sort(Collections.reverseOrder());
-            int kicker = getKeyByValue(countMap, 1);
+            int kicker = getKickers(countMap, pairs.get(0), pairs.get(1)).get(0);
             List<Integer> ranks = new ArrayList<>(pairs);
             ranks.add(kicker);
             return new PokerComparator.HandResult(PokerComparator.HandType.TWO_PAIR, ranks);
         }
+        // 一对
         if (counts.get(0) == 2) {
             int pair = getKeyByValue(countMap, 2);
-            List<Integer> kickers = getKickers(countMap, pair, -1);
+            List<Integer> kickers = getKickers(countMap, pair);
             List<Integer> ranks = new ArrayList<>();
             ranks.add(pair);
             ranks.addAll(kickers);
             return new PokerComparator.HandResult(PokerComparator.HandType.ONE_PAIR, ranks);
         }
+        // 高牌
         return new PokerComparator.HandResult(PokerComparator.HandType.HIGH_CARD, getRanks(cards));
     }
 
-    // 工具方法（可提取为静态工具类）
+    // 工具方法
+    private boolean isRoyal(List<PokerComparator.Card> cards) {
+        Set<Integer> royal = new HashSet<>(Arrays.asList(14, 13, 12, 11, 10));
+        for (PokerComparator.Card c : cards)
+            if (!royal.contains(c.rank.value))
+                return false;
+        return true;
+    }
+
     private int getStraightHighCard(List<PokerComparator.Card> cards) {
         List<Integer> values = new ArrayList<>();
         for (PokerComparator.Card c : cards) values.add(c.rank.value);
         Collections.sort(values, Collections.reverseOrder());
+        // A-5顺子
         if (values.get(0) == 14 && values.get(1) == 5) {
             return 5;
         }
@@ -120,6 +135,8 @@ public class LongCardCompareStrategy implements PokerCompareStrategy {
         List<Integer> values = new ArrayList<>();
         for (PokerComparator.Card c : cards)
             values.add(c.rank.value);
+        Collections.sort(values, Collections.reverseOrder());
+        // A-5顺子
         if (values.get(0) == 14 && values.get(1) == 5) {
             values.set(0, 1);
             Collections.sort(values, Collections.reverseOrder());
@@ -135,6 +152,7 @@ public class LongCardCompareStrategy implements PokerCompareStrategy {
         List<Integer> ranks = new ArrayList<>();
         for (PokerComparator.Card c : cards)
             ranks.add(c.rank.value);
+        ranks.sort(Collections.reverseOrder());
         return ranks;
     }
 

@@ -53,14 +53,30 @@ public class PlayerService {
     // 下注
     public void bet(Long playerId, int amount) {
         Player player = playerRepository.findById(playerId).orElseThrow();
-        if (player.getChips() < amount) {
-            throw new IllegalArgumentException("筹码不足");
-        }
+        if (player.getChips() < amount) throw new IllegalArgumentException("筹码不足");
         player.setChips(player.getChips() - amount);
-        player.setBetChips(amount);
+        player.setBetChips(player.getBetChips() + amount);
         player.setTotalBetChips(player.getTotalBetChips() + amount);
         player.setStatus(Player.PlayerStatus.ACTIVE);
         playerRepository.save(player);
+    }
+
+    // 加注
+    public void raise(Long playerId, int amount) {
+        // 你可以在这里加上加注规则校验
+        bet(playerId, amount);
+    }
+
+    // 跟注
+    public void call(Long playerId) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        GameSession session = player.getGameSession();
+        int maxBet = session.getPlayers().stream()
+            .mapToInt(Player::getBetChips)
+            .max().orElse(0);
+        int toCall = maxBet - player.getBetChips();
+        if (player.getChips() < toCall) throw new IllegalArgumentException("筹码不足以跟注");
+        bet(playerId, toCall);
     }
 
     // 弃牌
@@ -73,18 +89,23 @@ public class PlayerService {
     // 过牌
     public void check(Long playerId) {
         Player player = playerRepository.findById(playerId).orElseThrow();
+        GameSession session = player.getGameSession();
+        int maxBet = session.getPlayers().stream()
+            .mapToInt(Player::getBetChips)
+            .max().orElse(0);
+        if (maxBet > 0 && player.getBetChips() < maxBet) {
+            throw new IllegalStateException("当前不能过牌，只能跟注或弃牌");
+        }
         player.setStatus(Player.PlayerStatus.ACTIVE);
         playerRepository.save(player);
     }
 
-    // All-in（全下）
+    // 全下
     public void allIn(Long playerId) {
         Player player = playerRepository.findById(playerId).orElseThrow();
         int allInAmount = player.getChips();
-        if (allInAmount <= 0) {
-            throw new IllegalArgumentException("玩家没有可用筹码");
-        }
-        player.setBetChips(allInAmount);
+        if (allInAmount <= 0) throw new IllegalArgumentException("玩家没有可用筹码");
+        player.setBetChips(player.getBetChips() + allInAmount);
         player.setTotalBetChips(player.getTotalBetChips() + allInAmount);
         player.setChips(0);
         player.setStatus(Player.PlayerStatus.ALL_IN);

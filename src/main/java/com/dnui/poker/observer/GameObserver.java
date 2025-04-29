@@ -28,10 +28,17 @@ public class GameObserver {
             listener.onGameSettle(tableId);
         }
     }
+
+    public void notifyDealCard(Long tableId) {
+        for (GameEventListener listener : listeners) {
+            listener.onDealCard(tableId);
+        }
+    }
 }
 
 // 事件监听接口
 interface GameEventListener {
     void onGameStart(Long tableId);
     void onGameSettle(Long tableId);
+    void onDealCard(Long tableId);
 }

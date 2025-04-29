@@ -10,6 +10,7 @@ import com.dnui.poker.strategy.PokerComparator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -44,6 +45,7 @@ public class DealerService {
 
     /**
      * 发牌
+     *
      * @param tableId 桌子/牌局ID
      */
     public void dealCards(Long tableId) {
@@ -74,5 +76,15 @@ public class DealerService {
      */
     public List<PokerComparator.Card> getDeck() {
         return Collections.unmodifiableList(deck);
+    }
+
+    // 伪代码，可在GameService或DealerService中实现
+    public void deductBlinds(GameSession session, int smallBlind, int bigBlind) {
+        List<Player> players = session.getPlayers();
+        // 假设第一个是小盲，第二个是大盲
+        Player sb = players.get(0);
+        Player bb = players.get(1);
+        playerService.bet(sb.getId(), smallBlind);
+        playerService.bet(bb.getId(), bigBlind);
     }
 }

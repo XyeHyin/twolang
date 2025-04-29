@@ -1,6 +1,8 @@
 package com.dnui.poker.controller;
 
-import com.dnui.poker.service.GameService;
+import com.dnui.poker.facade.GameFacade;
+import com.dnui.poker.vo.GameResultVO;
+import com.dnui.poker.vo.TableStatusVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,23 +17,27 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/game")
 public class GameController {
     @Autowired
-    private GameService gameService;
+    private GameFacade gameFacade;
 
     @PostMapping("/start")
     public String startGame(@RequestParam Long tableId) {
-        gameService.startGame(tableId);
+        gameFacade.startGame(tableId);
         return "Game started";
     }
 
     @PostMapping("/action")
     public String playerAction(@RequestParam Long playerId, @RequestParam String action, @RequestParam int amount) {
-        gameService.handlePlayerAction(playerId, action, amount);
+        gameFacade.playerAction(playerId, action, amount);
         return "Action processed";
     }
 
     @GetMapping("/status")
-    public String getGameStatus(@RequestParam Long tableId) {
-        // 查询当前牌局状态
-        return "status";
+    public TableStatusVO getGameStatus(@RequestParam Long tableId) {
+        return gameFacade.getTableStatus(tableId);
+    }
+
+    @GetMapping("/result")
+    public GameResultVO getGameResult(@RequestParam Long tableId) {
+        return gameFacade.getGameResult(tableId);
     }
 }

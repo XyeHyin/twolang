@@ -1,7 +1,10 @@
 package com.dnui.poker.entity;
 
+import com.dnui.poker.strategy.PokerComparator;
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.util.List;
 
 /**
  * @Author: XyeHyin
@@ -36,6 +39,7 @@ public class Player {
 
     @Enumerated(EnumType.STRING)
     private PlayerStatus status; // 玩家状态
+
 
     public enum PlayerStatus {
         WAITING, ACTIVE, FOLDED, ALL_IN, SETTLED

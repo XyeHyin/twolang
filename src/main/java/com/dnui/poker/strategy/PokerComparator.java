@@ -20,6 +20,9 @@ public class PokerComparator {
         public final Suit suit;
         public final Rank rank;
         public Card(Suit suit, Rank rank) { this.suit = suit; this.rank = rank; }
+        public String toString() {
+            return rank.name() + suit.name().charAt(0);
+        }
     }
     public enum HandType {
         ROYAL_FLUSH, STRAIGHT_FLUSH, FOUR_OF_A_KIND, FULL_HOUSE, FLUSH,
