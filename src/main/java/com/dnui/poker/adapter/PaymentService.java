@@ -21,6 +21,4 @@ public class WechatPaySDK {
         // ...调用微信支付...
         return true;
     }
-}*-+
-+
--
+}
