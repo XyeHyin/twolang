@@ -6,15 +6,23 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 全局唯一的牌桌/房间管理器
+ * 单例模式（懒汉式，线程安全）
  */
 public class TableManager {
-    private static final TableManager INSTANCE = new TableManager();
+    private static volatile TableManager instance;
     private final Map<Long, GameSession> tableMap = new ConcurrentHashMap<>();
 
     private TableManager() {}
 
     public static TableManager getInstance() {
-        return INSTANCE;
+        if (instance == null) {
+            synchronized (TableManager.class) {
+                if (instance == null) {
+                    instance = new TableManager();
+                }
+            }
+        }
+        return instance;
     }
 
     public void addTable(Long tableId, GameSession session) {

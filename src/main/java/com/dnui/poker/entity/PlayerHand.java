@@ -25,7 +25,8 @@ public class PlayerHand {
     @JoinColumn(name = "game_session_id")
     private GameSession gameSession;
 
-    private String cardValue; // 如 "AS", "KH"
+    @Column(length = 4)
+    private String cardValue; // 统一大写，如 "AS", "KH"
 
-    private int cardOrder; // 手牌顺序（1-2）
+    private int cardOrder; // 1-2
 }

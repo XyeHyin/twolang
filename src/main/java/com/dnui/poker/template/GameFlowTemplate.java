@@ -26,6 +26,9 @@ public abstract class GameFlowTemplate {
     // 6. 结束清理
     protected abstract void finish(GameSession session);
 
+    // 返回该模板支持的玩法类型（如 "TEXAS", "SHORT_DECK"）
+    public abstract String getPlayType();
+
     // 模板方法：控制整个牌局流程
     public final void run(GameSession session) {
         prepare(session);// 准备阶段
@@ -39,5 +42,10 @@ public abstract class GameFlowTemplate {
         bettingRounds(session); // 河牌后下注
         settle(session);// 结算阶段
         finish(session);// 清理阶段
+    }
+
+    // 可选：支持流程推进的模板实现该接口
+    public interface SupportsStepAdvance {
+        void advance(GameSession session);
     }
 }

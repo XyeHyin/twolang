@@ -15,4 +15,9 @@ public class CardFactorySelector {
         }
         return new CardFactory.StandardDeckFactory();
     }
+
+    // 新增：短牌工厂选择方法
+    public CardFactory selectShortDeckFactory() {
+        return new CardFactory.ShortDeckFactory();
+    }
 }

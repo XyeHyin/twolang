@@ -230,4 +230,10 @@ public class ShortDeckCompareStrategy implements PokerCompareStrategy {
         if (typeA != typeB) return Integer.compare(typeA, typeB);
         return a.compareTo(b);
     }
+
+    // 可供模板调用的短牌结算方法
+    public void settleShortDeck(Long tableId) {
+        // 这里应调用GameService的短牌结算逻辑
+        // 具体实现略
+    }
 }

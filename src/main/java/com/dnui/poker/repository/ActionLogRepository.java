@@ -20,6 +20,5 @@ public interface ActionLogRepository extends JpaRepository<ActionLog, Long> {
     List<ActionLog> findByGameSession(GameSession gameSession);
     List<ActionLog> findByPlayer(Player player);
     List<ActionLog> findByGameSessionAndPlayer(GameSession gameSession, Player player);
-    // 查询某局某轮的所有操作
     List<ActionLog> findByGameSessionAndRound(GameSession gameSession, int round);
 }

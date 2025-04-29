@@ -18,8 +18,16 @@ public class GameSession {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    private String tableName;
+
+    private int maxPlayers;
+
+    private String playType; // "TEXAS", "SHORT_DECK" 等
+
+    @Temporal(TemporalType.TIMESTAMP)
     private Date startTime;
-     
+
     @OneToMany(mappedBy = "gameSession", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Player> players;
 
@@ -28,15 +36,7 @@ public class GameSession {
 
     private boolean isActive; // 是否为当前活跃牌局
 
-    private int pot;
-    @ManyToOne
-    private Player smallBlindPlayer;
+    private int pot = 0;
 
     private int currentRound; // 0-翻牌前, 1-翻牌, 2-转牌, 3-河牌
-
-    @ManyToOne
-    private Player currentActionPlayer;
-
-    
-    
 }

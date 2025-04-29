@@ -9,7 +9,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GameEventListener {
+public class GameEventListenerImpl implements GameEventListener {
     @Autowired
     private GameWebSocketService wsService;
     @Autowired
@@ -27,5 +27,25 @@ public class GameEventListener {
         } else {
             wsService.sendGameEvent(event.getTableId(), event.getType(), null);
         }
+    }
+
+    @Override
+    public void onGameStart(Long tableId) {
+        // Implementation here
+    }
+
+    @Override
+    public void onGameSettle(Long tableId) {
+        // Implementation here
+    }
+
+    @Override
+    public void onDealCard(Long tableId) {
+        // Implementation here
+    }
+
+    @Override
+    public void onGameEnd(Long tableId) {
+        // Implementation here
     }
 }

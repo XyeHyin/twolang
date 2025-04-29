@@ -7,6 +7,7 @@ public class AliPayAdapter implements PaymentService {
 
     @Override
     public String pay(String userId, double amount) {
+        // 适配SDK返回二维码URL
         return aliPaySDK.aliPay(userId, amount);
     }
 }

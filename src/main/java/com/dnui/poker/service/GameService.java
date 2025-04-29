@@ -1,7 +1,8 @@
 package com.dnui.poker.service;
 
-import com.dnui.poker.adapter.PokerRuleAdapter;
 import com.dnui.poker.command.*;
+import com.dnui.poker.dto.TableStatusVO;
+import com.dnui.poker.dto.GameResultVO;
 import com.dnui.poker.entity.GameSession;
 import com.dnui.poker.entity.Player;
 import com.dnui.poker.event.GameEvent;
@@ -9,16 +10,22 @@ import com.dnui.poker.factory.CardFactory;
 import com.dnui.poker.observer.GameObserver;
 import com.dnui.poker.observer.WebSocketGameEventListener;
 import com.dnui.poker.repository.GameSessionRepository;
+import com.dnui.poker.repository.PlayerRepository;
+import com.dnui.poker.repository.PublicCardRepository;
 import com.dnui.poker.strategy.PokerComparator;
 import com.dnui.poker.strategy.PokerCompareStrategy;
 import com.dnui.poker.strategy.LongCardCompareStrategy;
 import com.dnui.poker.strategy.ShortDeckCompareStrategy;
+import com.dnui.poker.template.GameFlowTemplateFactory;
+import com.dnui.poker.template.GameFlowTemplate;
+import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -30,80 +37,89 @@ import java.util.List;
  */
 @Service
 public class GameService {
+    @Getter
     @Autowired
     private DealerService dealerService;
+    @Getter
     @Autowired
     private PlayerService playerService;
+    @Getter
     @Autowired
     private GameSessionRepository gameSessionRepository;
+    @Getter
     @Autowired
-    private PokerComparator pokerComparator;
+    private PlayerRepository playerRepository;
+    @Getter
+    @Autowired
+    private PublicCardRepository publicCardRepository;
+    // 修正：PokerComparator 不是 Bean，直接 new
+    @Getter
+    private final PokerComparator pokerComparator = new PokerComparator();
+    @Getter
     @Autowired
     private CommandInvoker commandInvoker;
+    // 提供给模板调用：获取事件发布器
+    @Getter
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+    @Autowired
+    private GameFlowTemplateFactory templateFactory;
 
+    // 提供给模板调用：获取GameObserver
+    @Getter
     private final GameObserver gameObserver = new GameObserver();
 
     public GameService() {
-        // 注册监听器
+        // 注册监听器（观察者模式）
         gameObserver.addListener(new WebSocketGameEventListener());
     }
 
+    // 提供给模板调用：获取PokerCompareStrategy
     /**
      * -- SETTER --
      *  设置牌型比较策略（可根据房间配置动态注入）
      */
+    @Getter
     @Setter
     private PokerCompareStrategy compareStrategy;
 
-    // 初始化标准德扑
+    // 工厂+策略模式：初始化不同玩法
     public void initTexasHoldem() {
-        CardFactory factory = new CardFactory.StandardDeckFactory();
-        this.compareStrategy = new LongCardCompareStrategy();
+        CardFactory factory = new CardFactory.StandardDeckFactory(); // 工厂模式
+        this.compareStrategy = new LongCardCompareStrategy(); // 策略模式
     }
 
-    // 初始化短牌德扑
     public void initShortDeck() {
-        CardFactory factory = new CardFactory.ShortDeckFactory();
-        this.compareStrategy = new ShortDeckCompareStrategy(factory);
+        CardFactory factory = new CardFactory.ShortDeckFactory(); // 工厂模式
+        this.compareStrategy = new ShortDeckCompareStrategy(factory); // 策略模式
     }
 
     /**
      * 开始新牌局
+     * 模板方法模式：流程控制
+     * 观察者模式：推送事件
      */
     public void startGame(Long tableId) {
-        // 1. 通过 TableManager 获取或创建 GameSession
-        GameSession session = TableManager.getInstance().getTable(tableId);
-        if (session == null) {
-            session = new GameSession();
-            session.setId(tableId);
-            TableManager.getInstance().addTable(tableId, session);
-        }
+        GameSession session = gameSessionRepository.findById(tableId)
+            .orElseThrow(() -> new IllegalArgumentException("房间不存在"));
+        session.setActive(true);
+        session.setStartTime(new Date());
+        gameSessionRepository.save(session);
 
-        // 2. 初始化玩法策略
-        this.compareStrategy = new LongCardCompareStrategy(); // 或 ShortDeckCompareStrategy
+        // 动态选择模板
+        GameFlowTemplate flow = templateFactory.getTemplate(session.getPlayType()); // 工厂+模板方法
+        flow.run(session); // 模板方法
 
-        // 3. 洗牌、发牌
-        dealerService.shuffle();
-        dealerService.dealCards(tableId);
-
-        // 4. 初始化流程模板（如德扑/短牌）
-        GameFlowTemplate flow = new TexasHoldemGameFlow(this, dealerService, commandInvoker);
-
-        // 5. 进入第一轮下注
-        flow.startBettingRound(session);
-
-        // 6. 推送事件
-        gameObserver.notifyGameStart(tableId);
-        eventPublisher.publishEvent(new GameEvent(this, tableId, "start"));
+        gameObserver.notifyGameStart(tableId); // 观察者
+        eventPublisher.publishEvent(new GameEvent(this, tableId, "start")); // 事件
     }
 
     /**
      * 处理玩家操作
+     * 命令模式：封装玩家操作
      */
     public void handlePlayerAction(Long playerId, String action, int amount) {
-        // 1. 封装命令模式
+        // 命令模式
         Command command = switch (action) {
             case "bet" -> new BetCommand(playerId, amount, playerService);
             case "raise" -> new RaiseCommand(playerId, amount, playerService);
@@ -113,137 +129,115 @@ public class GameService {
             case "allin" -> new AllInCommand(playerId, playerService);
             default -> throw new IllegalArgumentException("未知操作");
         };
-        commandInvoker.executeCommand(command);
+        commandInvoker.executeCommand(command); // 命令调用者
 
-        // 2. 判断下注轮是否结束，推进流程
+        // 模板方法推进流程
         GameSession session = playerService.getPlayerSession(playerId);
-        if (isBettingRoundOver(session)) {
-            advanceGamePhase(session);
-        }
-        if (session.getPhase() == GamePhase.SHOWDOWN) {
-            settle(session.getId());
+        GameFlowTemplate flow = templateFactory.getTemplate(session.getPlayType());
+        if (flow instanceof GameFlowTemplate.SupportsStepAdvance advancer) {
+            advancer.advance(session);
         }
 
-        // 3. 推送玩家操作事件
+        // 观察者/事件
         eventPublisher.publishEvent(new GameEvent(this, session.getId(), "action", /* actionDTO */ null));
-    }
-
-    // 判断当前下注轮是否结束（所有未弃牌/未全下玩家都已操作且筹码相等）
-    private boolean isBettingRoundOver(GameSession session) {
-        int maxBet = session.getPlayers().stream()
-            .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
-            .mapToInt(Player::getBetChips)
-            .max().orElse(0);
-
-        return session.getPlayers().stream()
-            .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE)
-            .allMatch(p -> p.getBetChips() == maxBet);
-    }
-
-    // 推进游戏阶段
-    private void advanceGamePhase(GameSession session) {
-        switch (session.getPhase()) {
-            case PRE_FLOP -> {
-                session.setPhase(GamePhase.FLOP);
-                // 发三张公共牌
-                dealerService.dealFlop(session);
-            }
-            case FLOP -> {
-                session.setPhase(GamePhase.TURN);
-                dealerService.dealTurn(session);
-            }
-            case TURN -> {
-                session.setPhase(GamePhase.RIVER);
-                dealerService.dealRiver(session);
-            }
-            case RIVER -> session.setPhase(GamePhase.SHOWDOWN);
-            default -> {}
-        }
-        // 重置每个玩家本轮下注
-        session.getPlayers().forEach(p -> p.setBetChips(0));
-        // 保存session
-        // gameSessionRepository.save(session);
     }
 
     /**
      * 结算牌局
+     * 模板方法推进到SHOWDOWN
      */
     public void settle(Long tableId) {
         GameSession session = gameSessionRepository.findById(tableId).orElseThrow();
-        List<Player> players = session.getPlayers();
-        List<PokerComparator.Card> publicCards = session.getPublicCards();
-        eventPublisher.publishEvent(new GameEvent(this, tableId, "settle"));
-        // 1. 统计每个玩家总下注
-        List<Player> activePlayers = players.stream()
-            .filter(p -> p.getStatus() != Player.PlayerStatus.FOLDED)
-            .toList();
-
-        // 2. 计算所有下注金额，按从小到大排序，准备分池
-        List<Integer> allBets = players.stream()
-            .map(Player::getTotalBetChips)
-            .filter(bet -> bet > 0)
-            .distinct()
-            .sorted()
-            .toList();
-
-        int from = 0;
-        for (int i = 0; i < allBets.size(); i++) {
-            int to = allBets.get(i);
-            int pool = 0;
-            List<Player> poolPlayers = players.stream()
-                .filter(p -> p.getTotalBetChips() >= to)
-                .toList();
-
-            // 计算本池金额
-            for (Player p : poolPlayers) {
-                int bet = Math.min(p.getTotalBetChips(), to) - from;
-                pool += bet;
+        GameFlowTemplate flow = templateFactory.getTemplate(session.getPlayType());
+        // 修正：不能直接调用 protected settle，建议通过流程推进或事件驱动结算
+        // 推荐做法：触发流程推进到结算阶段（如有需要可实现一个公共方法或事件）
+        if (flow instanceof GameFlowTemplate.SupportsStepAdvance advancer) {
+            // 多次推进直到进入SHOWDOWN并自动结算
+            while (session.getPhase() != null && session.getPhase().ordinal() < com.dnui.poker.dto.GamePhase.SHOWDOWN.ordinal()) {
+                advancer.advance(session);
             }
-
-            // 参与本池的未弃牌玩家
-            List<Player> eligible = poolPlayers.stream()
-                .filter(p -> p.getStatus() != Player.PlayerStatus.FOLDED)
-                .toList();
-
-            // 比牌，找出本池赢家（可能多人平分）
-            PokerComparator.HandResult best = null;
-            List<Player> winners = new ArrayList<>();
-            for (Player p : eligible) {
-                PokerComparator.HandResult result = compareStrategy.evaluateBestHand(p.getHandCards(), publicCards);
-                if (best == null || result.compareTo(best) > 0) {
-                    best = result;
-                    winners.clear();
-                    winners.add(p);
-                } else if (result.compareTo(best) == 0) {
-                    winners.add(p);
-                }
-            }
-
-            // 平分本池
-            int share = pool / winners.size();
-            int remain = pool % winners.size();
-            for (Player win : winners) {
-                win.setChips(win.getChips() + share);
-            }
-            // 剩余筹码给第一个赢家
-            if (remain > 0) {
-                winners.get(0).setChips(winners.get(0).getChips() + remain);
-            }
-
-            from = to;
         }
+    }
 
-        // 5. 更新数据库
-        players.forEach(playerRepository::save);
-        session.setActive(false);
-        gameSessionRepository.save(session);
-        gameObserver.notifyGameSettle(tableId);
-        eventPublisher.publishEvent(new GameEvent(this, tableId, "settle"));
+    // 短牌结算
+    public void settleShortDeck(Long tableId) {
+        // 这里可以调用 settle(tableId) 或实现短牌专用结算逻辑
+        settle(tableId);
     }
 
     public void dealCard(Long tableId) {
-        // ...发牌逻辑...
         gameObserver.notifyDealCard(tableId);
         eventPublisher.publishEvent(new GameEvent(this, tableId, "deal"));
+    }
+
+    // 构建桌面状态VO
+    public TableStatusVO buildTableStatusVO(Long tableId) {
+        GameSession session = gameSessionRepository.findById(tableId).orElse(null);
+        TableStatusVO vo = new TableStatusVO();
+        if (session != null) {
+            vo.setTableId(session.getId());
+            // 玩家信息
+            List<TableStatusVO.PlayerStatusInfo> playerInfos = new ArrayList<>();
+            if (session.getPlayers() != null) {
+                for (Player p : session.getPlayers()) {
+                    TableStatusVO.PlayerStatusInfo info = new TableStatusVO.PlayerStatusInfo();
+                    info.setPlayerId(p.getId());
+                    info.setNickname(p.getNickname());
+                    info.setChips(p.getChips());
+                    info.setSeatNumber(p.getSeatNumber());
+                    info.setOnline(p.isOnline());
+                    info.setBetChips(p.getBetChips());
+                    info.setStatus(p.getStatus() != null ? p.getStatus().name() : null);
+                    info.setAvatar(p.getAvatar());
+                    // 其他属性如 isCurrent、hand 可根据业务补充
+                    playerInfos.add(info);
+                }
+            }
+            vo.setPlayers(playerInfos);
+            // 公共牌
+            List<String> publicCards = new ArrayList<>();
+            publicCardRepository.findByGameSession(session).forEach(card -> publicCards.add(card.getCardValue()));
+            vo.setPublicCards(publicCards);
+            // 其他字段
+            vo.setPot(session.getPot());
+            vo.setPhase(session.getPhase() != null ? session.getPhase().name() : null);
+        }
+        return vo;
+    }
+
+    // 构建结算VO
+    public GameResultVO buildGameResultVO(Long tableId) {
+        GameSession session = gameSessionRepository.findById(tableId).orElse(null);
+        GameResultVO vo = new GameResultVO();
+        if (session != null) {
+            // 获胜者信息（此处仅示例，实际应根据结算逻辑填充）
+            List<GameResultVO.WinnerInfo> winners = new ArrayList<>();
+            // ...结算逻辑填充winners...
+            vo.setWinners(winners);
+
+            // 所有玩家结算信息
+            List<GameResultVO.PlayerSettleInfo> allPlayers = new ArrayList<>();
+            if (session.getPlayers() != null) {
+                for (Player p : session.getPlayers()) {
+                    GameResultVO.PlayerSettleInfo info = new GameResultVO.PlayerSettleInfo();
+                    info.setPlayerId(p.getId());
+                    info.setNickname(p.getNickname());
+                    info.setChipsAfter(p.getChips());
+                    info.setTotalBet(p.getTotalBetChips());
+                    // winAmount/status/hand等需根据结算逻辑补充
+                    allPlayers.add(info);
+                }
+            }
+            vo.setAllPlayers(allPlayers);
+
+            // 公共牌
+            List<String> publicCards = new ArrayList<>();
+            publicCardRepository.findByGameSession(session).forEach(card -> publicCards.add(card.getCardValue()));
+            vo.setPublicCards(publicCards);
+
+            vo.setTotalPot(session.getPot());
+            // handType/isShowdown等需根据结算逻辑补充
+        }
+        return vo;
     }
 }

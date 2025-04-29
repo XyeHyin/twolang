@@ -7,6 +7,7 @@ import com.dnui.poker.repository.PlayerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.Optional;
 
 /**
@@ -29,8 +30,9 @@ public class PlayerService {
         player.setNickname(nickname);
         player.setChips(10000);
         player.setOnline(true);
+        player.setRegisterTime(new Date());
         player.setStatus(Player.PlayerStatus.WAITING);
-        return playerRepository.save(player);
+        return playerRepository.save(player); // repository落地
     }
 
     // 玩家加入房间
@@ -39,7 +41,7 @@ public class PlayerService {
         GameSession session = gameSessionRepository.findById(gameSessionId).orElseThrow();
         player.setGameSession(session);
         player.setStatus(Player.PlayerStatus.WAITING);
-        playerRepository.save(player);
+        playerRepository.save(player); // repository落地
     }
 
     // 玩家离开房间
@@ -47,7 +49,7 @@ public class PlayerService {
         Player player = playerRepository.findById(playerId).orElseThrow();
         player.setGameSession(null);
         player.setStatus(Player.PlayerStatus.WAITING);
-        playerRepository.save(player);
+        playerRepository.save(player); // repository落地
     }
 
     // 下注
@@ -58,12 +60,11 @@ public class PlayerService {
         player.setBetChips(player.getBetChips() + amount);
         player.setTotalBetChips(player.getTotalBetChips() + amount);
         player.setStatus(Player.PlayerStatus.ACTIVE);
-        playerRepository.save(player);
+        playerRepository.save(player); // repository落地
     }
 
     // 加注
     public void raise(Long playerId, int amount) {
-        // 你可以在这里加上加注规则校验
         bet(playerId, amount);
     }
 
@@ -83,7 +84,7 @@ public class PlayerService {
     public void fold(Long playerId) {
         Player player = playerRepository.findById(playerId).orElseThrow();
         player.setStatus(Player.PlayerStatus.FOLDED);
-        playerRepository.save(player);
+        playerRepository.save(player); // repository落地
     }
 
     // 过牌
@@ -97,7 +98,7 @@ public class PlayerService {
             throw new IllegalStateException("当前不能过牌，只能跟注或弃牌");
         }
         player.setStatus(Player.PlayerStatus.ACTIVE);
-        playerRepository.save(player);
+        playerRepository.save(player); // repository落地
     }
 
     // 全下
@@ -109,6 +110,39 @@ public class PlayerService {
         player.setTotalBetChips(player.getTotalBetChips() + allInAmount);
         player.setChips(0);
         player.setStatus(Player.PlayerStatus.ALL_IN);
-        playerRepository.save(player);
+        playerRepository.save(player); // repository落地
+    }
+
+    // 获取玩家所在牌局
+    public GameSession getPlayerSession(Long playerId) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return player.getGameSession();
+    }
+
+    // 查询玩家
+    public Optional<Player> findByNickname(String nickname) {
+        return playerRepository.findByNickname(nickname);
+    }
+
+    // 重置玩家状态
+    public void resetPlayers(com.dnui.poker.entity.GameSession session) {
+        // 实现：遍历session.getPlayers()，重置状态
+        if (session == null || session.getPlayers() == null) return;
+        for (com.dnui.poker.entity.Player p : session.getPlayers()) {
+            p.setStatus(com.dnui.poker.entity.Player.PlayerStatus.ACTIVE);
+            p.setBetChips(0);
+            // 其他需要重置的属性
+        }
+    }
+
+    // 结束一轮，清理玩家状态
+    public void finishRound(com.dnui.poker.entity.GameSession session) {
+        // 实现：遍历session.getPlayers()，做清理
+        if (session == null || session.getPlayers() == null) return;
+        for (com.dnui.poker.entity.Player p : session.getPlayers()) {
+            // 例如重置下注、状态等
+            p.setBetChips(0);
+            // 其他清理逻辑
+        }
     }
 }

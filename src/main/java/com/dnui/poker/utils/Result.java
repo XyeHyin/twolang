@@ -1,4 +1,4 @@
-package com.dnui.poker.dto;
+package com.dnui.poker.utils;
 
 import lombok.Data;
 

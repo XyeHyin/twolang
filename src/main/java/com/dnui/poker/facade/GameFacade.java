@@ -8,4 +8,10 @@ public interface GameFacade {
     void playerAction(Long playerId, String action, int amount);
     TableStatusVO getTableStatus(Long tableId);
     GameResultVO getGameResult(Long tableId);
+
+    // 新增接口
+    void joinTable(Long playerId, Long tableId);
+    void leaveTable(Long playerId, Long tableId);
+    Long createTable(String tableName, int maxPlayers, String playType);
+    void closeTable(Long tableId);
 }

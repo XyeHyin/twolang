@@ -27,9 +27,14 @@ public class ActionLog {
 
     private String actionType; // "bet", "raise", "call", "fold", "check" 等
 
-    private int amount; // 操作金额，非下注类为0
+    private int amount;
 
-    private int round; // 第几轮（翻牌前/翻牌/转牌/河牌）
+    private int round;
 
+    private String ip; // 可选
+
+    private String device; // 可选
+
+    @Temporal(TemporalType.TIMESTAMP)
     private Date actionTime;
 }

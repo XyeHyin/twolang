@@ -34,6 +34,14 @@ public class GameObserver {
             listener.onDealCard(tableId);
         }
     }
+
+    public void notifyGameEnd(Long tableId) {
+        for (GameEventListener listener : listeners) {
+            // 可自定义onGameEnd方法，或用onGameSettle/onGameStart等替代
+            // 这里简单用onGameSettle模拟
+            listener.onGameSettle(tableId);
+        }
+    }
 }
 
 // 事件监听接口

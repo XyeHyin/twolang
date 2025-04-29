@@ -21,7 +21,8 @@ public class PublicCard {
     @JoinColumn(name = "game_session_id")
     private GameSession gameSession;
 
-    private String cardValue; // 如 "AS", "KH"
+    @Column(length = 4)
+    private String cardValue; // 统一大写
 
-    private int cardOrder; // 公共牌顺序（1-5）
+    private int cardOrder; // 1-5
 }

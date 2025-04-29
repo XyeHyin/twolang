@@ -12,6 +12,8 @@ import lombok.Data;
 @Data
 public class GameActionDTO {
     private Long playerId;
-    private String action; // "bet", "fold", "check" 等
-    private int amount;    // 下注金额，非下注操作可为0
+    private String action;
+    private int amount;
+    private String time; // 操作时间
+    private int round;   // 轮次
 }

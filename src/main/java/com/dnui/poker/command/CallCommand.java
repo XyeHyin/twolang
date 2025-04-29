@@ -3,7 +3,7 @@ package com.dnui.poker.command;
 import com.dnui.poker.service.PlayerService;
 
 /**
- * 跟注命令
+ * 命令模式：跟注命令
  */
 public class CallCommand implements Command {
     private final Long playerId;

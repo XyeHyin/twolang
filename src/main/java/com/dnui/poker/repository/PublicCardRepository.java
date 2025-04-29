@@ -17,4 +17,7 @@ import java.util.List;
 @Repository
 public interface PublicCardRepository extends JpaRepository<PublicCard, Long> {
     List<PublicCard> findByGameSession(GameSession gameSession);
+
+    // 新增：统计某局的公共牌数量
+    long countByGameSession(GameSession session);
 }
