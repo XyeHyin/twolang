@@ -8,17 +8,24 @@ import java.util.List;
 /**
  * @Author: XyeHyin
  * @Date: 2025/4/24 13:46
- * @packageName:IntelliJ IDEA
- * @Description: 牌局/房间实体
+ * @packageName: IntelliJ IDEA
+ * @Description: 牌局/房间的实体
  * @Version: 1.0
  */
 @Entity
 @Data
+@Table(
+    name = "game_session",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"table_name"})
+    }
+)
 public class GameSession {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "table_name", nullable = false, unique = true, length = 64)
     private String tableName;
 
     private int maxPlayers;

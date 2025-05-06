@@ -7,9 +7,10 @@ import java.util.Date;
 @Entity
 @Data
 @Table(
+    name = "player",
     uniqueConstraints = {
         @UniqueConstraint(columnNames = {"nickname"}),
-        @UniqueConstraint(columnNames = {"game_session_id", "seatNumber"})
+        @UniqueConstraint(columnNames = {"game_session_id", "seat_number"})
     }
 )
 public class Player {
@@ -22,7 +23,7 @@ public class Player {
 
     private int chips;
 
-    private int seatNumber; // 同一桌唯一约束
+    private Integer seatNumber;
 
     private boolean online;
 

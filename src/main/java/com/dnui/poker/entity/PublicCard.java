@@ -12,6 +12,7 @@ import lombok.Data;
  */
 @Entity
 @Data
+@Table (name = "public_card")
 public class PublicCard {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

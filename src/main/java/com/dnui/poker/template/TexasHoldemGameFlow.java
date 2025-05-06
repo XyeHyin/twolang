@@ -8,6 +8,7 @@ import com.dnui.poker.service.CommandInvoker;
 import com.dnui.poker.service.GameService;
 import com.dnui.poker.dto.GamePhase;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,6 +24,7 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
     @Autowired
     private CommandInvoker commandInvoker;
     @Autowired
+    @Lazy
     private GameService gameService;
 
     @Override

@@ -6,8 +6,10 @@ import com.dnui.poker.repository.GameSessionRepository;
 import com.dnui.poker.repository.PlayerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -18,6 +20,7 @@ import java.util.Optional;
  * @Version: 1.0
  */
 @Service
+@Transactional
 public class PlayerService {
     @Autowired
     private PlayerRepository playerRepository;
@@ -37,17 +40,54 @@ public class PlayerService {
 
     // 玩家加入房间
     public void joinGame(Long playerId, Long gameSessionId) {
-        Player player = playerRepository.findById(playerId).orElseThrow();
-        GameSession session = gameSessionRepository.findById(gameSessionId).orElseThrow();
+        Player player = playerRepository.findById(playerId)
+            .orElseThrow(() -> new IllegalArgumentException("玩家不存在: " + playerId));
+        GameSession session = gameSessionRepository.findById(gameSessionId)
+            .orElseThrow(() -> new IllegalArgumentException("房间不存在: " + gameSessionId));
+        List<Player> players = session.getPlayers();
+        int seatNumber = 1;
+        boolean found;
+        do {
+            found = false;
+            if (players != null) {
+                for (Player p : players) {
+                    if (p.getSeatNumber() != null && p.getSeatNumber() == seatNumber) {
+                        found = true;
+                        seatNumber++;
+                        break;
+                    }
+                }
+            }
+        } while (found);
         player.setGameSession(session);
+        player.setSeatNumber(seatNumber);
         player.setStatus(Player.PlayerStatus.WAITING);
-        playerRepository.save(player); // repository落地
+        playerRepository.save(player);
+    }
+
+    // 玩家加入房间（带座位号）
+    public void joinGame(Long playerId, Long gameSessionId, int seatNumber) {
+        Player player = playerRepository.findById(playerId)
+            .orElseThrow(() -> new IllegalArgumentException("玩家不存在: " + playerId));
+        GameSession session = gameSessionRepository.findById(gameSessionId)
+            .orElseThrow(() -> new IllegalArgumentException("房间不存在: " + gameSessionId));
+        // 校验座位是否被占用
+        boolean seatTaken = session.getPlayers() != null && session.getPlayers().stream()
+            .anyMatch(p -> p.getSeatNumber() == seatNumber);
+        if (seatTaken) {
+            throw new IllegalArgumentException("该座位已被占用");
+        }
+        player.setGameSession(session);
+        player.setSeatNumber(seatNumber);
+        player.setStatus(Player.PlayerStatus.WAITING);
+        playerRepository.save(player);
     }
 
     // 玩家离开房间
     public void leaveGame(Long playerId) {
         Player player = playerRepository.findById(playerId).orElseThrow();
         player.setGameSession(null);
+        player.setSeatNumber(null);
         player.setStatus(Player.PlayerStatus.WAITING);
         playerRepository.save(player); // repository落地
     }
@@ -128,22 +168,23 @@ public class PlayerService {
 
     // 重置玩家状态
     public void resetPlayers(com.dnui.poker.entity.GameSession session) {
-        // 实现：遍历session.getPlayers()，重置状态
         if (session == null || session.getPlayers() == null) return;
         for (com.dnui.poker.entity.Player p : session.getPlayers()) {
             p.setStatus(com.dnui.poker.entity.Player.PlayerStatus.ACTIVE);
             p.setBetChips(0);
+            p.setSeatNumber(null); // 清空座位号
+            p.setGameSession(null); // 可选：如需彻底清空房间
             // 其他需要重置的属性
         }
     }
 
     // 结束一轮，清理玩家状态
     public void finishRound(com.dnui.poker.entity.GameSession session) {
-        // 实现：遍历session.getPlayers()，做清理
         if (session == null || session.getPlayers() == null) return;
         for (com.dnui.poker.entity.Player p : session.getPlayers()) {
-            // 例如重置下注、状态等
             p.setBetChips(0);
+            p.setSeatNumber(null); // 清空座位号
+            p.setGameSession(null); // 可选：如需彻底清空房间
             // 其他清理逻辑
         }
     }

@@ -12,6 +12,7 @@ import lombok.Data;
  */
 @Entity
 @Data
+@Table (name = "player_hand")
 public class PlayerHand {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
