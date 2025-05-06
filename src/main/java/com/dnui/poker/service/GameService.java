@@ -5,6 +5,7 @@ import com.dnui.poker.dto.TableStatusVO;
 import com.dnui.poker.dto.GameResultVO;
 import com.dnui.poker.entity.GameSession;
 import com.dnui.poker.entity.Player;
+import com.dnui.poker.entity.PlayerHand;
 import com.dnui.poker.event.GameEvent;
 import com.dnui.poker.factory.CardFactory;
 import com.dnui.poker.observer.GameObserver;
@@ -12,6 +13,7 @@ import com.dnui.poker.observer.WebSocketGameEventListener;
 import com.dnui.poker.repository.GameSessionRepository;
 import com.dnui.poker.repository.PlayerRepository;
 import com.dnui.poker.repository.PublicCardRepository;
+import com.dnui.poker.repository.PlayerHandRepository;
 import com.dnui.poker.strategy.PokerComparator;
 import com.dnui.poker.strategy.PokerCompareStrategy;
 import com.dnui.poker.strategy.LongCardCompareStrategy;
@@ -25,6 +27,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -52,6 +55,8 @@ public class GameService {
     @Getter
     @Autowired
     private PublicCardRepository publicCardRepository;
+    @Autowired
+    private PlayerHandRepository playerHandRepository;
     // 修正：PokerComparator 不是 Bean，直接 new
     @Getter
     private final PokerComparator pokerComparator = new PokerComparator();
@@ -176,29 +181,32 @@ public class GameService {
         TableStatusVO vo = new TableStatusVO();
         if (session != null) {
             vo.setTableId(session.getId());
-            // 玩家信息
             List<TableStatusVO.PlayerStatusInfo> playerInfos = new ArrayList<>();
-            if (session.getPlayers() != null) {
-                for (Player p : session.getPlayers()) {
-                    TableStatusVO.PlayerStatusInfo info = new TableStatusVO.PlayerStatusInfo();
-                    info.setPlayerId(p.getId());
-                    info.setNickname(p.getNickname());
-                    info.setChips(p.getChips());
-                    info.setSeatNumber(p.getSeatNumber());
-                    info.setOnline(p.isOnline());
-                    info.setBetChips(p.getBetChips());
-                    info.setStatus(p.getStatus() != null ? p.getStatus().name() : null);
-                    info.setAvatar(p.getAvatar());
-                    // 其他属性如 isCurrent、hand 可根据业务补充
-                    playerInfos.add(info);
-                }
+            List<Player> players = playerRepository.findByGameSession(session);
+            for (Player p : players) {
+                TableStatusVO.PlayerStatusInfo info = new TableStatusVO.PlayerStatusInfo();
+                info.setPlayerId(p.getId());
+                info.setNickname(p.getNickname());
+                info.setChips(p.getChips());
+                info.setSeatNumber(p.getSeatNumber());
+                info.setOnline(p.isOnline());
+                info.setBetChips(p.getBetChips());
+                info.setStatus(p.getStatus() != null ? p.getStatus().name() : null);
+                info.setAvatar(p.getAvatar());
+                // 关键：查手牌
+                List<String> hand = playerHandRepository.findByPlayerAndGameSession(p, session)
+                    .stream()
+                    .sorted(Comparator.comparingInt(PlayerHand::getCardOrder))
+                    .map(PlayerHand::getCardValue)
+                    .toList();
+                info.setHand(hand);
+                playerInfos.add(info);
             }
             vo.setPlayers(playerInfos);
             // 公共牌
             List<String> publicCards = new ArrayList<>();
             publicCardRepository.findByGameSession(session).forEach(card -> publicCards.add(card.getCardValue()));
             vo.setPublicCards(publicCards);
-            // 其他字段
             vo.setPot(session.getPot());
             vo.setPhase(session.getPhase() != null ? session.getPhase().name() : null);
         }
@@ -210,33 +218,39 @@ public class GameService {
         GameSession session = gameSessionRepository.findById(tableId).orElse(null);
         GameResultVO vo = new GameResultVO();
         if (session != null) {
-            // 获胜者信息（此处仅示例，实际应根据结算逻辑填充）
-            List<GameResultVO.WinnerInfo> winners = new ArrayList<>();
-            // ...结算逻辑填充winners...
-            vo.setWinners(winners);
+            // 获胜者信息...（此处略，按你业务逻辑补全 winners 列表）
+            // vo.setWinners(...);
 
-            // 所有玩家结算信息
             List<GameResultVO.PlayerSettleInfo> allPlayers = new ArrayList<>();
-            if (session.getPlayers() != null) {
-                for (Player p : session.getPlayers()) {
-                    GameResultVO.PlayerSettleInfo info = new GameResultVO.PlayerSettleInfo();
-                    info.setPlayerId(p.getId());
-                    info.setNickname(p.getNickname());
-                    info.setChipsAfter(p.getChips());
-                    info.setTotalBet(p.getTotalBetChips());
-                    // winAmount/status/hand等需根据结算逻辑补充
-                    allPlayers.add(info);
-                }
+            List<Player> players = playerRepository.findByGameSession(session);
+            for (Player p : players) {
+                GameResultVO.PlayerSettleInfo info = new GameResultVO.PlayerSettleInfo();
+                info.setPlayerId(p.getId());
+                info.setNickname(p.getNickname());
+                info.setChipsAfter(p.getChips());
+                info.setTotalBet(p.getTotalBetChips());
+//                // 新增字段补全
+//                info.setWinAmount(p.getWinAmount() != null ? p.getWinAmount() : 0); // 需保证Player有此字段
+                info.setStatus(p.getStatus() != null ? p.getStatus().name() : null);
+                // 查手牌
+                List<String> hand = playerHandRepository.findByPlayerAndGameSession(p, session)
+                        .stream()
+                        .sorted(Comparator.comparingInt(PlayerHand::getCardOrder))
+                        .map(PlayerHand::getCardValue)
+                        .toList();
+                info.setHand(hand);
+
+                allPlayers.add(info);
             }
             vo.setAllPlayers(allPlayers);
-
             // 公共牌
             List<String> publicCards = new ArrayList<>();
             publicCardRepository.findByGameSession(session).forEach(card -> publicCards.add(card.getCardValue()));
             vo.setPublicCards(publicCards);
-
             vo.setTotalPot(session.getPot());
-            // handType/isShowdown等需根据结算逻辑补充
+//            // 其他字段补全
+//            vo.setHandType(session.getHandType()); // 需保证GameSession有此字段
+            vo.setShowdown(session.getPhase() != null && session.getPhase().name().equals("SHOWDOWN"));
         }
         return vo;
     }

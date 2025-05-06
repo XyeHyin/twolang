@@ -30,6 +30,6 @@ public class TableStatusVO {
         private String status;
         private String avatar;
         private boolean isCurrent; // 是否当前操作玩家
-        private List<String> hand; // 可选
+        private List<String> hand;
     }
 }

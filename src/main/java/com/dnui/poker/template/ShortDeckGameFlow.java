@@ -31,7 +31,10 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
     protected void prepare(GameSession session) {
         // 洗短牌、初始化玩家状态
         dealerService.shuffleShortDeck(session);
+        dealerService.clearPublicCards(session);
         playerService.resetPlayers(session);
+
+        session.setPhase(GamePhase.PRE_FLOP); // 初始化阶段
         // 新增：准备阶段扣除小盲和大盲
         dealerService.deductBlinds(session, 50, 100); // 这里50/100为示例金额，可根据实际配置调整
     }

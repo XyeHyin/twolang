@@ -23,4 +23,12 @@ public class PlayerController {
     public Result<Player> createPlayer(@RequestParam String nickname) {
         return Result.ok(playerService.createPlayer(nickname));
     }
+
+
+    @GetMapping("/findByNickname")
+    public Result<Player> findByNickname(@RequestParam String nickname) {
+        return playerService.findByNickname(nickname)
+            .map(Result::ok)
+            .orElse(Result.ok(null));
+    }
 }

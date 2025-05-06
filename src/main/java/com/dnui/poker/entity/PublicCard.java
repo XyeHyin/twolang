@@ -22,8 +22,8 @@ public class PublicCard {
     @JoinColumn(name = "game_session_id")
     private GameSession gameSession;
 
-    @Column(length = 4)
-    private String cardValue; // 统一大写
+    @Column(length = 8)
+    private String cardValue;
 
     private int cardOrder; // 1-5
 }

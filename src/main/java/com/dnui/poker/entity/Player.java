@@ -23,6 +23,7 @@ public class Player {
 
     private int chips;
 
+    @Column(name = "seat_number") // 不要加nullable = false
     private Integer seatNumber;
 
     private boolean online;

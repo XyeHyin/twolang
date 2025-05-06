@@ -32,10 +32,6 @@ public class ActionLog {
 
     private int round;
 
-    private String ip; // 可选
-
-    private String device; // 可选
-
     @Temporal(TemporalType.TIMESTAMP)
     private Date actionTime;
 }

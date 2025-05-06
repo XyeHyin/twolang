@@ -76,6 +76,10 @@ public class DealerService {
      * 发手牌到玩家（模板调用）
      */
     public void dealToPlayers(GameSession session) {
+        // 新增：发牌前清理本局所有玩家的旧手牌
+        List<PlayerHand> oldHands = playerHandRepository.findByGameSession(session);
+        playerHandRepository.deleteAll(oldHands);
+
         List<Player> players = session.getPlayers();
         if (deck.size() < players.size() * 2) {
             throw new IllegalStateException("牌数不足，无法发牌");
@@ -148,6 +152,14 @@ public class DealerService {
         publicCard.setCardValue(card.toString().toUpperCase());
         publicCard.setCardOrder(order);
         publicCardRepository.save(publicCard);
+    }
+
+    /**
+     * 清理本局所有公共牌
+     */
+    public void clearPublicCards(GameSession session) {
+        List<PublicCard> oldPublicCards = publicCardRepository.findByGameSession(session);
+        publicCardRepository.deleteAll(oldPublicCards);
     }
 
     /**
