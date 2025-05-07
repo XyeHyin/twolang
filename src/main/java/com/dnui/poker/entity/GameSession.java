@@ -46,4 +46,6 @@ public class GameSession {
     private int pot = 0;
 
     private int currentRound; // 0-翻牌前, 1-翻牌, 2-转牌, 3-河牌
+    
+    private Integer currentSeat; // 当前操作玩家座位号
 }

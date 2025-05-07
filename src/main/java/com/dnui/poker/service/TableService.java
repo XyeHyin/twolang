@@ -17,8 +17,8 @@ public class TableService {
         session.setMaxPlayers(maxPlayers);
         session.setPlayType(playType);
         session.setActive(true);
+        session.setPhase(com.dnui.poker.dto.GamePhase.PRE_FLOP);
         GameSession saved = gameSessionRepository.save(session);
-        // 单例模式：注册到全局TableManager
         TableManager.getInstance().addTable(saved.getId(), saved);
         return saved;
     }
@@ -27,7 +27,6 @@ public class TableService {
         GameSession session = gameSessionRepository.findById(tableId).orElseThrow();
         session.setActive(false);
         gameSessionRepository.save(session);
-        // 单例模式：移除
         TableManager.getInstance().removeTable(tableId);
     }
 

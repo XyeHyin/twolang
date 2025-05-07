@@ -1,19 +1,17 @@
 package com.dnui.poker.template;
 
+import com.dnui.poker.dto.GamePhase;
 import com.dnui.poker.entity.GameSession;
 import com.dnui.poker.entity.Player;
 import com.dnui.poker.service.DealerService;
 import com.dnui.poker.service.PlayerService;
-import com.dnui.poker.service.CommandInvoker;
 import com.dnui.poker.service.GameService;
-import com.dnui.poker.dto.GamePhase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
-/**
- * 德州扑克标准流程实现（继承模板方法骨架）
- */
+import java.util.List;
+
 @Component
 public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTemplate.SupportsStepAdvance {
 
@@ -22,55 +20,70 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
     @Autowired
     private PlayerService playerService;
     @Autowired
-    private CommandInvoker commandInvoker;
-    @Autowired
     @Lazy
     private GameService gameService;
 
     @Override
     protected void prepare(GameSession session) {
+        dealerService.clearPublicCards(session);
         dealerService.shuffle();
-        dealerService.clearPublicCards(session); // 新增：清理公共牌
-        playerService.resetPlayers(session);
-        // 新增：初始化阶段
         session.setPhase(GamePhase.PRE_FLOP);
-        dealerService.deductBlinds(session, 50, 100);
+        gameService.getGameSessionRepository().save(session);
     }
 
     @Override
     protected void dealCards(GameSession session) {
-        // 发手牌
         dealerService.dealToPlayers(session);
+        dealerService.deductBlinds(session, 50, 100); // 示例盲注
+        gameService.getGameSessionRepository().save(session);
     }
 
+    @Override
+    public String getPlayType() {
+        return "TEXAS";
+    }
     @Override
     protected void bettingRounds(GameSession session) {
-        // 下注轮（可根据session阶段判断是前注、翻牌后、转牌后、河牌后）
-        commandInvoker.executeBettingRound();
+        // 下注轮由前端驱动，这里无需实现
     }
 
     @Override
-    protected void revealPublicCards(GameSession session) {
-        // 发公共牌（翻牌/转牌/河牌）
-        dealerService.dealPublicCard(session);
+    protected void revealFlop(GameSession session) {
+        dealerService.dealFlop(session);
+        session.setPhase(GamePhase.FLOP);
+        gameService.getGameSessionRepository().save(session);
+    }
+
+    @Override
+    protected void revealTurn(GameSession session) {
+        dealerService.dealTurn(session);
+        session.setPhase(GamePhase.TURN);
+        gameService.getGameSessionRepository().save(session);
+    }
+
+    @Override
+    protected void revealRiver(GameSession session) {
+        dealerService.dealRiver(session);
+        session.setPhase(GamePhase.RIVER);
+        gameService.getGameSessionRepository().save(session);
     }
 
     @Override
     protected void settle(GameSession session) {
         // 结算
         gameService.settle(session.getId());
-        // 通知结算事件
         gameService.getGameObserver().notifyGameSettle(session.getId());
         gameService.getEventPublisher().publishEvent(
                 new com.dnui.poker.event.GameEvent(this, session.getId(), "settle")
         );
+        session.setPhase(GamePhase.SHOWDOWN);
+        gameService.getGameSessionRepository().save(session);
     }
 
     @Override
     protected void finish(GameSession session) {
         // 清理，准备下局
         playerService.finishRound(session);
-        // 通知结束事件
         gameService.getGameObserver().notifyGameEnd(session.getId());
         gameService.getEventPublisher().publishEvent(
                 new com.dnui.poker.event.GameEvent(this, session.getId(), "finish")
@@ -78,39 +91,42 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
     }
 
     @Override
-    public String getPlayType() {
-        return "TEXAS";
-    }
-
-    // 新增：流程推进
-    @Override
     public void advance(GameSession session) {
-        // 判断下注轮是否结束，推进阶段
         if (isBettingRoundOver(session)) {
             advanceGamePhase(session);
         }
-        // 新增：如果只剩一名未弃牌玩家，直接结算
         long activeCount = session.getPlayers().stream()
-                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
+                .filter(p -> p.getStatus() == com.dnui.poker.entity.Player.PlayerStatus.ACTIVE || p.getStatus() == com.dnui.poker.entity.Player.PlayerStatus.ALL_IN)
                 .count();
         if (activeCount <= 1 || session.getPhase() == GamePhase.SHOWDOWN) {
             settle(session);
         }
     }
 
-    // 判断下注轮是否结束（与原GameService逻辑一致）
     private boolean isBettingRoundOver(GameSession session) {
-        int maxBet = session.getPlayers().stream()
-                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
-                .mapToInt(Player::getBetChips)
-                .max().orElse(0);
+    // 只考虑未弃牌/未全下的玩家
+    List<Player> activePlayers = session.getPlayers().stream()
+            .filter(p -> p.getStatus() != Player.PlayerStatus.FOLDED && p.getStatus() != Player.PlayerStatus.ALL_IN)
+            .toList();
 
-        return session.getPlayers().stream()
-                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE)
-                .allMatch(p -> p.getBetChips() == maxBet);
-    }
+    // 没有玩家处于 WAITING_FOR_ACTION
+    boolean allActed = activePlayers.stream()
+            .noneMatch(p -> p.getStatus() == Player.PlayerStatus.WAITING_FOR_ACTION);
 
-    // 推进游戏阶段（与原GameService逻辑一致）
+    // 所有活跃玩家下注额相等
+    int maxBet = session.getPlayers().stream()
+            .mapToInt(Player::getBetChips)
+            .max().orElse(0);
+
+    boolean allBetEqual = activePlayers.stream()
+            .allMatch(p -> p.getBetChips() == maxBet);
+
+    // 至少有两名活跃玩家
+    boolean enoughPlayers = activePlayers.size() >= 2;
+
+    return allActed && allBetEqual && enoughPlayers;
+}
+
     private void advanceGamePhase(GameSession session) {
         switch (session.getPhase()) {
             case PRE_FLOP -> {
@@ -126,12 +142,10 @@ public class TexasHoldemGameFlow extends GameFlowTemplate implements GameFlowTem
                 dealerService.dealRiver(session);
             }
             case RIVER -> session.setPhase(GamePhase.SHOWDOWN);
-            default -> {
-            }
+            default -> {}
         }
-        // 重置每个玩家本轮下注
+        // 每轮结束后重置下注
         session.getPlayers().forEach(p -> p.setBetChips(0));
-        // 保存session
         gameService.getGameSessionRepository().save(session);
     }
 }

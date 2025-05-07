@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @Author: XyeHyin
@@ -128,6 +130,8 @@ public class PlayerService {
         int toCall = maxBet - player.getBetChips();
         if (player.getChips() < toCall) throw new IllegalArgumentException("筹码不足以跟注");
         bet(playerId, toCall);
+         player.setStatus(Player.PlayerStatus.ACTIVE);
+    playerRepository.save(player);
     }
 
     // 弃牌
@@ -195,40 +199,43 @@ public class PlayerService {
 
     // 填充机器人
     public void fillRobotsIfNeeded(Long gameSessionId) {
-        GameSession session = gameSessionRepository.findById(gameSessionId)
-            .orElseThrow(() -> new IllegalArgumentException("房间不存在: " + gameSessionId));
-        int maxPlayers = session.getMaxPlayers();
-        List<Player> players = session.getPlayers();
-        int currentCount = players == null ? 0 : players.size();
-        int robotIndex = 1;
-        while (currentCount < maxPlayers) {
-            Player robot = new Player();
-            robot.setNickname("机器人" + robotIndex);
-            robot.setChips(10000);
-            robot.setOnline(true);
-            robot.setRegisterTime(new Date());
-            robot.setStatus(Player.PlayerStatus.WAITING);
-            robot.setGameSession(session);
-            // 分配seatNumber
-            int seatNumber = 1;
-            boolean found;
-            do {
-                found = false;
-                if (players != null) {
-                    for (Player p : players) {
-                        if (p.getSeatNumber() != null && p.getSeatNumber() == seatNumber) {
-                            found = true;
-                            seatNumber++;
-                            break;
-                        }
-                    }
-                }
-            } while (found);
-            robot.setSeatNumber(seatNumber);
-            playerRepository.save(robot);
-            if (players != null) players.add(robot);
-            currentCount++;
-            robotIndex++;
+    }
+
+    /**
+     * 补机器人到指定座位
+     */
+    public void fillRobot(Long tableId, int seatNumber) {
+        GameSession session = gameSessionRepository.findById(tableId)
+            .orElseThrow(() -> new IllegalArgumentException("房间不存在: " + tableId));
+        List<Player> players = playerRepository.findByGameSession(session);
+        boolean seatTaken = players.stream().anyMatch(p -> p.getSeatNumber() != null && p.getSeatNumber() == seatNumber);
+        if (seatTaken) {
+            throw new IllegalArgumentException("该座位已被占用");
         }
+
+        // 全局查找所有机器人昵称
+        List<Player> allPlayers = playerRepository.findAll();
+        Set<String> usedNicknames = new HashSet<>();
+        for (Player p : allPlayers) {
+            if (p.getNickname() != null && p.getNickname().startsWith("机器人")) {
+                usedNicknames.add(p.getNickname());
+            }
+        }
+        int robotIndex = 1;
+        String robotNickname;
+        do {
+            robotNickname = "机器人" + robotIndex;
+            robotIndex++;
+        } while (usedNicknames.contains(robotNickname));
+
+        Player robot = new Player();
+        robot.setNickname(robotNickname);
+        robot.setChips(10000);
+        robot.setOnline(true);
+        robot.setRegisterTime(new Date());
+        robot.setStatus(Player.PlayerStatus.WAITING);
+        robot.setGameSession(session);
+        robot.setSeatNumber(seatNumber);
+        playerRepository.save(robot);
     }
 }

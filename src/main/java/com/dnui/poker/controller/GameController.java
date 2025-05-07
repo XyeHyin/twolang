@@ -1,5 +1,6 @@
 package com.dnui.poker.controller;
-
+import com.dnui.poker.service.GameService;
+import com.dnui.poker.service.PlayerService;
 import com.dnui.poker.facade.GameFacade;
 import com.dnui.poker.dto.GameResultVO;
 import com.dnui.poker.dto.TableStatusVO;
@@ -19,6 +20,11 @@ import org.springframework.web.bind.annotation.*;
 public class GameController {
     @Autowired
     private GameFacade gameFacade;
+
+    @Autowired
+    private PlayerService playerService;
+    @Autowired
+    private GameService gameService;
 
     @PostMapping("/start")
     public Result<String> startGame(@RequestParam Long tableId) {
@@ -111,4 +117,21 @@ public class GameController {
             return Result.fail("离开房间失败: " + e.getMessage());
         }
     }
+
+    @PostMapping("/fillRobot")
+    public Result<String> fillRobot(@RequestParam Long tableId, @RequestParam int seatNumber) {
+        try {
+            playerService.fillRobot(tableId, seatNumber);
+            return Result.ok("机器人已补齐");
+        } catch (Exception e) {
+            return Result.fail("补机器人失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/forceNextPhase")
+    public Result<Void> forceNextPhase(@RequestParam Long tableId) {
+        gameService.forceNextPhase(tableId);
+        return Result.ok(null);
+    }
+
 }

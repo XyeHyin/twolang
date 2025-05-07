@@ -43,7 +43,12 @@ public class Player {
     @Enumerated(EnumType.STRING)
     private PlayerStatus status;
 
-    public enum PlayerStatus {
-        WAITING, ACTIVE, FOLDED, ALL_IN, SETTLED
-    }
+   public enum PlayerStatus {
+    WAITING, // 等待新局
+    WAITING_FOR_ACTION, // 当前应操作
+    ACTIVE, // 已操作
+    FOLDED, // 弃牌
+    ALL_IN, // 全下
+    SETTLED // 已结算
+}
 }

@@ -1,6 +1,7 @@
 package com.dnui.poker.service;
 
 import com.dnui.poker.command.*;
+import com.dnui.poker.dto.GamePhase;
 import com.dnui.poker.dto.TableStatusVO;
 import com.dnui.poker.dto.GameResultVO;
 import com.dnui.poker.entity.GameSession;
@@ -99,6 +100,35 @@ public class GameService {
         this.compareStrategy = new ShortDeckCompareStrategy(factory); // 策略模式
     }
 
+    private void initFirstActionPlayer(GameSession session) {
+        List<Player> players = session.getPlayers();
+        int n = players.size();
+        // 找到大盲
+        int maxBet = players.stream().mapToInt(Player::getBetChips).max().orElse(0);
+        int bbSeat = players.stream()
+            .filter(p -> p.getBetChips() == maxBet && p.getStatus() == Player.PlayerStatus.ACTIVE)
+            .mapToInt(Player::getSeatNumber)
+            .findFirst().orElse(1);
+
+        // UTG是大盲左侧第一个未弃牌/未全下玩家
+        int utgSeat = -1;
+        for (int i = 1; i <= n; i++) {
+            int seat = (bbSeat + i - 1) % n + 1;
+            Player p = players.stream().filter(x -> x.getSeatNumber() == seat).findFirst().orElse(null);
+            if (p != null && p.getStatus() != Player.PlayerStatus.FOLDED && p.getStatus() != Player.PlayerStatus.ALL_IN) {
+                utgSeat = seat;
+                break;
+            }
+        }
+        for (Player p : players) {
+            if (p.getSeatNumber() == utgSeat) {
+                p.setStatus(Player.PlayerStatus.WAITING_FOR_ACTION);
+                session.setCurrentSeat(utgSeat);
+            } else if (p.getStatus() != Player.PlayerStatus.FOLDED && p.getStatus() != Player.PlayerStatus.ALL_IN) {
+                p.setStatus(Player.PlayerStatus.ACTIVE);
+            }
+        }
+    }
     /**
      * 开始新牌局
      * 模板方法模式：流程控制
@@ -107,16 +137,24 @@ public class GameService {
     public void startGame(Long tableId) {
         GameSession session = gameSessionRepository.findById(tableId)
                 .orElseThrow(() -> new IllegalArgumentException("房间不存在"));
-        session.setActive(true);
-        session.setStartTime(new Date());
-        gameSessionRepository.save(session);
+        GameFlowTemplate flow = templateFactory.getTemplate(session.getPlayType());
+        flow.runPreflop(session); // 只做准备、发手牌和preflop下注
+        initFirstActionPlayer(session); // 关键：初始化第一个操作玩家
+        gameObserver.notifyGameStart(tableId);
+        eventPublisher.publishEvent(new GameEvent(this, tableId, "start"));
+    }
 
-        // 动态选择模板
-        GameFlowTemplate flow = templateFactory.getTemplate(session.getPlayType()); // 工厂+模板方法
-        flow.run(session); // 模板方法
-
-        gameObserver.notifyGameStart(tableId); // 观察者
-        eventPublisher.publishEvent(new GameEvent(this, tableId, "start")); // 事件
+    public void advancePhase(Long tableId) {
+        GameSession session = gameSessionRepository.findById(tableId)
+                .orElseThrow(() -> new IllegalArgumentException("房间不存在"));
+        GameFlowTemplate flow = templateFactory.getTemplate(session.getPlayType());
+        switch (session.getPhase()) {
+            case PRE_FLOP -> flow.runFlop(session);
+            case FLOP -> flow.runTurn(session);
+            case TURN -> flow.runRiver(session);
+            case RIVER -> flow.runShowdown(session);
+            default -> {}
+        }
     }
 
     /**
@@ -124,7 +162,7 @@ public class GameService {
      * 命令模式：封装玩家操作
      */
     public void handlePlayerAction(Long playerId, String action, int amount) {
-        // 命令模式
+        // 1. 执行命令
         Command command = switch (action) {
             case "bet" -> new BetCommand(playerId, amount, playerService);
             case "raise" -> new RaiseCommand(playerId, amount, playerService);
@@ -134,17 +172,142 @@ public class GameService {
             case "allin" -> new AllInCommand(playerId, playerService);
             default -> throw new IllegalArgumentException("未知操作");
         };
-        commandInvoker.executeCommand(command); // 命令调用者
+        commandInvoker.executeCommand(command);
 
-        // 模板方法推进流程
         GameSession session = playerService.getPlayerSession(playerId);
+
+        // 2. 轮转到下一个玩家
+        rotateToNextPlayer(session);
+
+        // 3. 判断下注轮是否结束
+        if (isBettingRoundOver(session)) {
         GameFlowTemplate flow = templateFactory.getTemplate(session.getPlayType());
         if (flow instanceof GameFlowTemplate.SupportsStepAdvance advancer) {
             advancer.advance(session);
         }
+        }else {
+            // 4. 如果下一个是机器人，自动操作
+            Player next = getCurrentPlayer(session);
+            if (next != null && isRobot(next)) {
+                autoRobotAction(session);
+            }
+        }
 
-        // 观察者/事件
-        eventPublisher.publishEvent(new GameEvent(this, session.getId(), "action", /* actionDTO */ null));
+        // 5. 推送事件
+        eventPublisher.publishEvent(new GameEvent(this, session.getId(), "action", null));
+    }
+
+    // 轮转到下一个玩家
+    private void rotateToNextPlayer(GameSession session) {
+        List<Player> players = session.getPlayers();
+        int n = players.size();
+        Integer currentSeat = session.getCurrentSeat();
+        int startSeat = currentSeat != null ? currentSeat : 1;
+        int nextSeat = -1;
+        for (int i = 1; i <= n; i++) {
+            int seat = (startSeat + i - 1) % n + 1;
+            Player p = players.stream().filter(x -> x.getSeatNumber() == seat).findFirst().orElse(null);
+            if (p != null && p.getStatus() != Player.PlayerStatus.FOLDED && p.getStatus() != Player.PlayerStatus.ALL_IN && p.getStatus() != Player.PlayerStatus.ACTIVE) {
+                nextSeat = seat;
+                break;
+            }
+        }
+        for (Player p : players) {
+            if (p.getSeatNumber() == nextSeat) {
+                p.setStatus(Player.PlayerStatus.WAITING_FOR_ACTION);
+                session.setCurrentSeat(nextSeat);
+            } else if (p.getStatus() != Player.PlayerStatus.FOLDED && p.getStatus() != Player.PlayerStatus.ALL_IN) {
+                p.setStatus(Player.PlayerStatus.ACTIVE);
+            }
+        }
+    }
+
+    // 判断下注轮是否结束
+    private boolean isBettingRoundOver(GameSession session) {
+        // 只考虑未弃牌/未全下的玩家
+        List<Player> activePlayers = session.getPlayers().stream()
+                .filter(p -> p.getStatus() != Player.PlayerStatus.FOLDED && p.getStatus() != Player.PlayerStatus.ALL_IN)
+                .toList();
+
+        // 1. 没有玩家处于 WAITING_FOR_ACTION
+        boolean allActed = activePlayers.stream()
+                .noneMatch(p -> p.getStatus() == Player.PlayerStatus.WAITING_FOR_ACTION);
+
+        // 2. 所有活跃玩家下注额相等
+        int maxBet = activePlayers.stream()
+                .mapToInt(Player::getBetChips)
+                .max().orElse(0);
+
+        boolean allBetEqual = activePlayers.stream()
+                .allMatch(p -> p.getBetChips() == maxBet);
+
+        // 3. 至少有两名活跃玩家
+        boolean enoughPlayers = activePlayers.size() >= 2;
+
+        return allActed && allBetEqual && enoughPlayers;
+    }
+
+    // 获取当前操作玩家
+    private Player getCurrentPlayer(GameSession session) {
+        return session.getPlayers().stream()
+                .filter(p -> p.getStatus() == Player.PlayerStatus.WAITING_FOR_ACTION)
+                .findFirst().orElse(null);
+    }
+
+    // 判断是否机器人
+    private boolean isRobot(Player player) {
+        return player.getNickname() != null && player.getNickname().startsWith("机器人");
+    }
+
+    // 自动机器人操作
+    private void autoRobotAction(GameSession session) {
+        Player next = getCurrentPlayer(session);
+        while (next != null && isRobot(next)) {
+            String robotAction = decideRobotAction(next, session);
+            int amount = decideRobotAmount(next, session, robotAction);
+            handlePlayerAction(next.getId(), robotAction, amount);
+            next = getCurrentPlayer(session);
+        }
+    }
+
+    // 机器人决策逻辑（可自定义）
+    private String decideRobotAction(Player robot, GameSession session) {
+        int maxBet = session.getPlayers().stream().mapToInt(Player::getBetChips).max().orElse(0);
+        if (robot.getBetChips() == maxBet) return "check";
+        if (robot.getChips() + robot.getBetChips() >= maxBet) return "call";
+        return "fold";
+    }
+
+    private int decideRobotAmount(Player robot, GameSession session, String action) {
+        int maxBet = session.getPlayers().stream().mapToInt(Player::getBetChips).max().orElse(0);
+        switch (action) {
+            case "call": return maxBet - robot.getBetChips();
+            case "bet": return 100; // 示例
+            default: return 0;
+        }
+    }
+
+    // 推进阶段
+    private void advanceGamePhase(GameSession session) {
+        switch (session.getPhase()) {
+            case PRE_FLOP -> {
+                session.setPhase(GamePhase.FLOP);
+                dealerService.dealFlop(session);
+            }
+            case FLOP -> {
+                session.setPhase(GamePhase.TURN);
+                dealerService.dealTurn(session);
+            }
+            case TURN -> {
+                session.setPhase(GamePhase.RIVER);
+                dealerService.dealRiver(session);
+            }
+            case RIVER -> session.setPhase(GamePhase.SHOWDOWN);
+            default -> {}
+        }
+        session.getPlayers().forEach(p -> p.setBetChips(0));
+        gameSessionRepository.save(session);
+        playerRepository.saveAll(session.getPlayers());
     }
 
     /**
@@ -254,4 +417,12 @@ public class GameService {
         }
         return vo;
     }
+    // GameService.java
+public void forceNextPhase(Long tableId) {
+    GameSession session = gameSessionRepository.findById(tableId)
+        .orElseThrow(() -> new IllegalArgumentException("房间不存在"));
+    advanceGamePhase(session);
+    initFirstActionPlayer(session);
+    eventPublisher.publishEvent(new GameEvent(this, tableId, "forceNextPhase", null));
+}
 }

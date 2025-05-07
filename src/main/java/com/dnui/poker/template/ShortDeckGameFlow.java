@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * 短牌德州扑克流程实现（继承模板方法骨架）
  */
@@ -37,24 +39,41 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
         session.setPhase(GamePhase.PRE_FLOP); // 初始化阶段
         // 新增：准备阶段扣除小盲和大盲
         dealerService.deductBlinds(session, 50, 100); // 这里50/100为示例金额，可根据实际配置调整
+        gameService.getGameSessionRepository().save(session);
     }
 
     @Override
     protected void dealCards(GameSession session) {
-        // 发手牌（短牌）
         dealerService.dealToPlayers(session);
+        gameService.getGameSessionRepository().save(session);
     }
 
     @Override
     protected void bettingRounds(GameSession session) {
-        // 下注轮
-        commandInvoker.executeBettingRound();
+        // 下注轮由前端驱动，通常这里为空实现
+        // 如果你有自动机器人下注，可以在这里调用
+        // commandInvoker.executeBettingRound();
     }
 
     @Override
-    protected void revealPublicCards(GameSession session) {
-        // 发公共牌
-        dealerService.dealPublicCard(session);
+    protected void revealFlop(GameSession session) {
+        dealerService.dealFlop(session);
+        session.setPhase(GamePhase.FLOP);
+        gameService.getGameSessionRepository().save(session);
+    }
+
+    @Override
+    protected void revealTurn(GameSession session) {
+        dealerService.dealTurn(session);
+        session.setPhase(GamePhase.TURN);
+        gameService.getGameSessionRepository().save(session);
+    }
+
+    @Override
+    protected void revealRiver(GameSession session) {
+        dealerService.dealRiver(session);
+        session.setPhase(GamePhase.RIVER);
+        gameService.getGameSessionRepository().save(session);
     }
 
     @Override
@@ -66,6 +85,8 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
         gameService.getEventPublisher().publishEvent(
                 new com.dnui.poker.event.GameEvent(this, session.getId(), "settle")
         );
+        session.setPhase(GamePhase.SHOWDOWN);
+        gameService.getGameSessionRepository().save(session);
     }
 
     @Override
@@ -84,6 +105,7 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
         return "SHORT_DECK";
     }
 
+    // 支持逐步推进
     @Override
     public void advance(GameSession session) {
         if (isBettingRoundOver(session)) {
@@ -98,15 +120,28 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
     }
 
     private boolean isBettingRoundOver(GameSession session) {
-        int maxBet = session.getPlayers().stream()
-                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE || p.getStatus() == Player.PlayerStatus.ALL_IN)
-                .mapToInt(Player::getBetChips)
-                .max().orElse(0);
+    // 只考虑未弃牌/未全下的玩家
+    List<Player> activePlayers = session.getPlayers().stream()
+            .filter(p -> p.getStatus() != Player.PlayerStatus.FOLDED && p.getStatus() != Player.PlayerStatus.ALL_IN)
+            .toList();
 
-        return session.getPlayers().stream()
-                .filter(p -> p.getStatus() == Player.PlayerStatus.ACTIVE)
-                .allMatch(p -> p.getBetChips() == maxBet);
-    }
+    // 没有玩家处于 WAITING_FOR_ACTION
+    boolean allActed = activePlayers.stream()
+            .noneMatch(p -> p.getStatus() == Player.PlayerStatus.WAITING_FOR_ACTION);
+
+    // 所有活跃玩家下注额相等
+    int maxBet = session.getPlayers().stream()
+            .mapToInt(Player::getBetChips)
+            .max().orElse(0);
+
+    boolean allBetEqual = activePlayers.stream()
+            .allMatch(p -> p.getBetChips() == maxBet);
+
+    // 至少有两名活跃玩家
+    boolean enoughPlayers = activePlayers.size() >= 2;
+
+    return allActed && allBetEqual && enoughPlayers;
+}
 
     private void advanceGamePhase(GameSession session) {
         switch (session.getPhase()) {
@@ -123,9 +158,9 @@ public class ShortDeckGameFlow extends GameFlowTemplate implements GameFlowTempl
                 dealerService.dealRiver(session);
             }
             case RIVER -> session.setPhase(GamePhase.SHOWDOWN);
-            default -> {
-            }
+            default -> {}
         }
+        // 每轮结束后重置下注
         session.getPlayers().forEach(p -> p.setBetChips(0));
         gameService.getGameSessionRepository().save(session);
     }
